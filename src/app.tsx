@@ -2,7 +2,7 @@
 import { Router } from "@solidjs/router";
 import { FileRoutes } from "@solidjs/start/router";
 import { Suspense, ErrorBoundary } from "solid-js";
-import { MetaProvider, Title, Meta } from "@solidjs/meta";
+import { MetaProvider, Title, Meta, Link } from "@solidjs/meta";
 import "./app.css";
 
 // Global loading fallback
@@ -76,11 +76,17 @@ export default function App() {
             root={(props) => (
                 <MetaProvider>
                     {/* Default meta tags */}
-                    <Title>PJP Monitor - Dashboard</Title>
+                    <Title>Store Visit Form</Title>
                     <Meta charset="utf-8" />
                     <Meta name="viewport" content="width=device-width, initial-scale=1" />
-                    <Meta name="description" content="PJP Payment Service Provider Monitoring Dashboard" />
+                    <Meta name="description" content="Store Visit Form" />
                     <Meta name="theme-color" content="#111827" />
+                    
+                    {/* PWA Manifest & Icons */}
+                    <Link rel="manifest" href="/manifest.webmanifest" />
+                    <Link rel="apple-touch-icon" href="/favicon.ico.ico" />
+                    <Meta name="apple-mobile-web-app-capable" content="yes" />
+                    <Meta name="apple-mobile-web-app-status-bar-style" content="black" />
 
                     <ErrorBoundary fallback={(err) => <GlobalError error={err} />}>
                         <Suspense fallback={<GlobalLoader />}>

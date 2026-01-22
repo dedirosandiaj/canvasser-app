@@ -111,7 +111,7 @@ export async function submitVisit(data: VisitData): Promise<{ success: boolean; 
             data.kecamatan,
             data.status,
             data.link_foto,
-            `${data.lat},${data.lng}`,
+            `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lng}`,
             data.keterangan || ''
         ];
 

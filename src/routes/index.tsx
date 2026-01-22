@@ -1,13 +1,27 @@
-import { createSignal, Show, onMount } from 'solid-js';
+import { createSignal, Show, onMount, createEffect } from 'solid-js';
+import imageCompression from 'browser-image-compression';
 import { submitVisit, type VisitData } from '~/lib/server/sheets';
 import { uploadToGoogleDrive } from '~/lib/server/gdrive';
 import { TextField, Button, Card, Alert, PhotoCapture, SalesAutocomplete } from '~/components/ui';
+import Swal from 'sweetalert2';
 
 export default function CanvasserForm() {
+
+    // Small SweetAlert Configuration
+    const smallSwal = Swal.mixin({
+        width: '320px',
+        customClass: {
+            popup: 'text-sm',
+            title: 'text-lg font-bold',
+            confirmButton: 'text-sm px-4 py-2'
+        },
+        buttonsStyling: true
+    });
 
     const [manualMode, setManualMode] = createSignal(false);
 
     // Form state
+    // Form state - Initialize from localStorage if available
     const [formData, setFormData] = createSignal({
         nama_sales: '',
         nama_toko: '',
@@ -17,6 +31,32 @@ export default function CanvasserForm() {
         kecamatan: '',
         status: '',
         keterangan: '',
+    });
+
+    onMount(() => {
+        const savedData = localStorage.getItem('canvasser_form_data');
+        if (savedData) {
+            try {
+                const parsed = JSON.parse(savedData);
+                setFormData(prev => ({ ...prev, ...parsed }));
+                // If there's saved data, minimal restore feedback if needed, 
+                // but usually silent restore is better for "Old Input" behavior.
+            } catch (e) {
+                console.error('Failed to parse saved form data', e);
+            }
+        }
+        
+        // Auto-trigger location slightly delayed
+        setTimeout(() => {
+            console.log("Auto-triggering location...");
+            getLocation();
+        }, 1000);
+    });
+
+    // Persist form data to localStorage whenever it changes
+    createEffect(() => {
+        const data = formData();
+        localStorage.setItem('canvasser_form_data', JSON.stringify(data));
     });
 
     const [photoFile, setPhotoFile] = createSignal<File | null>(null);
@@ -133,7 +173,12 @@ export default function CanvasserForm() {
         } catch (e: any) {
             console.error('IP Geo Failed:', e);
             setDebugStatus(prev => prev + `\n❌ Semua metode gagal. Mohon isi manual.`);
-            alert("Gagal mendapatkan lokasi otomatis. Silakan gunakan 'Mode Manual' dan isi form secara manual.");
+            smallSwal.fire({
+                icon: 'error',
+                title: 'Lokasi Gagal',
+                text: "Gagal mendapatkan lokasi otomatis. Silakan gunakan 'Mode Manual' dan isi form secara manual.",
+                confirmButtonText: 'OK'
+            });
         } finally {
             setLocationLoading(false);
         }
@@ -195,25 +240,10 @@ export default function CanvasserForm() {
         );
     };
 
-    const [geoState, setGeoState] = createSignal({
-        ready: false,
-        secure: false,
-        hasGeo: false,
-        protocol: '',
-        host: ''
-    });
+
 
     // Auto-get location on mount
     onMount(() => {
-        // Run diagnostics
-        setGeoState({
-            ready: true,
-            secure: window.isSecureContext,
-            hasGeo: 'geolocation' in navigator,
-            protocol: window.location.protocol,
-            host: window.location.hostname
-        });
-
         // We delay slightly to ensure UI is ready, but still trigger it.
         setTimeout(() => {
             console.log("Auto-triggering location...");
@@ -237,27 +267,59 @@ export default function CanvasserForm() {
 
         // Validation
         if (!formData().nama_sales || !formData().nama_toko || !formData().nama_pic || !formData().status || !photoFile()) {
-            setError('Please fill all required fields and ensure location is active.');
+             smallSwal.fire({
+                icon: 'error',
+                title: 'Data Belum Lengkap',
+                text: 'Mohon isi semua field yang wajib dan pastikan foto sudah diambil.',
+                confirmButtonText: 'OK'
+            });
             return;
         }
 
         // Location Check: Required unless Manual Mode is ON
         if (!coords() && !manualMode()) {
-            setError('Location is required. Please enable GPS or check "Mode Manual".');
+            smallSwal.fire({
+                 icon: 'error',
+                 title: 'Lokasi Kosong',
+                 text: 'Lokasi wajib diisi. Mohon aktifkan GPS atau gunakan "Mode Manual".',
+                 confirmButtonText: 'OK'
+             });
             return;
         }
 
         if (formData().status === 'Follow-Up' && !formData().no_telp) {
-            setError('Phone number is required for Follow-Up.');
+             smallSwal.fire({
+                 icon: 'error',
+                 title: 'Nomor Telepon Kosong',
+                 text: 'Nomor telepon wajib diisi untuk status Follow-Up.',
+                 confirmButtonText: 'OK'
+             });
             return;
         }
 
         setLoading(true);
 
         try {
-            // 1. Upload Photo
-            const fileArrayBuffer = await photoFile()!.arrayBuffer();
-            const uploadRes = await uploadToGoogleDrive(fileArrayBuffer, `visit_${Date.now()}_${photoFile()!.name}`, photoFile()!.type);
+            // 1. Compress & Upload Photo
+            let fileToUpload = photoFile()!;
+            
+            console.log('Original file size:', fileToUpload.size / 1024 / 1024, 'MB');
+
+            const options = {
+                maxSizeMB: 0.8, // Max 800KB
+                maxWidthOrHeight: 1280,
+                useWebWorker: true
+            };
+
+            try {
+                fileToUpload = await imageCompression(fileToUpload, options);
+                console.log('Compressed file size:', fileToUpload.size / 1024 / 1024, 'MB');
+            } catch (cErr) {
+                console.error('Compression failed, using original:', cErr);
+            }
+
+            const fileArrayBuffer = await fileToUpload.arrayBuffer();
+            const uploadRes = await uploadToGoogleDrive(fileArrayBuffer, `visit_${Date.now()}_${fileToUpload.name}`, fileToUpload.type);
 
             if (!uploadRes.success || !uploadRes.link) {
                 throw new Error(uploadRes.error || 'Failed to upload photo');
@@ -279,21 +341,25 @@ export default function CanvasserForm() {
                 throw new Error(sheetRes.error || 'Failed to save data');
             }
 
-            setSuccess(true);
-            setFormData({
-                nama_sales: '',
-                nama_toko: '',
-                nama_pic: '',
-                no_telp: '',
-                kota: '',
-                kecamatan: '',
-                status: '',
-                keterangan: '',
+            // Success!!
+            await smallSwal.fire({
+                icon: 'success',
+                title: 'Berhasil!',
+                text: 'Data kunjungan berhasil disimpan.',
+                confirmButtonText: 'OK'
             });
-            setPhotoFile(null);
-            setPreviewUrl(null);
+            
+            // Clear storage and reload
+            localStorage.removeItem('canvasser_form_data');
+            window.location.reload();
 
         } catch (err: any) {
+             smallSwal.fire({
+                icon: 'error',
+                title: 'Terjadi Kesalahan',
+                text: err.message || 'Gagal menyimpan data. Silakan coba lagi.',
+                confirmButtonText: 'OK'
+            });
             setError(err.message || 'An error occurred');
         } finally {
             setLoading(false);
@@ -303,14 +369,13 @@ export default function CanvasserForm() {
     return (
         <div class="min-h-screen bg-gray-50 p-4">
             <div class="max-w-md mx-auto space-y-6">
+                <div class="flex justify-center">
+                    <img src="/logo-nusacita.png" alt="Logo" class="h-20 w-20 object-contain drop-shadow-md" />
+                </div>
                 <h1 class="text-2xl font-bold text-gray-900 text-center">Store Visit Form</h1>
 
                 <Show when={error()}>
                     <Alert variant="filled" severity="error">{error()}</Alert>
-                </Show>
-
-                <Show when={success()}>
-                    <Alert variant="filled" severity="success">Visit recorded successfully!</Alert>
                 </Show>
 
                 <form onSubmit={handleSubmit} class="space-y-4">
@@ -410,7 +475,8 @@ export default function CanvasserForm() {
                             </div>
 
                             {/* Geo Status & Manual Toggle */}
-                            <div class="space-y-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                            {/* Geo Status & Manual Toggle */}
+                            <div class="space-y-3">
                                 <div class="flex items-center justify-between">
                                     <label class="flex items-center gap-2 cursor-pointer select-none">
                                         <input 
@@ -419,13 +485,25 @@ export default function CanvasserForm() {
                                             onChange={(e) => setManualMode(e.currentTarget.checked)}
                                             class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
                                         />
-                                        <span class="text-sm font-medium text-gray-700">Mode Manual (Tanpa GPS)</span>
+                                        <span class="text-sm font-medium text-gray-700">Input Manual</span>
                                     </label>
-                                    <span class="text-xs text-gray-400 italic">Gunakan jika GPS Error</span>
+                                    
+                                    <Show when={!manualMode()}>
+                                        <Button 
+                                            type="button" 
+                                            variant="text" 
+                                            size="sm" 
+                                            onClick={() => getLocation()}
+                                            disabled={locationLoading()}
+                                            class="text-xs"
+                                        >
+                                            {locationLoading() ? "Mencari..." : "Refresh Lokasi"}
+                                        </Button>
+                                    </Show>
                                 </div>
 
                                 <Show when={manualMode()}>
-                                    <div class="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div class="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1">
                                         <TextField
                                             label="Latitude"
                                             value={coords()?.lat.toString() || '0'}
@@ -441,62 +519,38 @@ export default function CanvasserForm() {
                                             fullWidth
                                         />
                                     </div>
-                                    <div class="text-xs text-orange-600 bg-orange-50 p-2 rounded">
-                                        ⚠️ Lokasi akan tercatat manual/kosong. Pastikan alamat terisi benar.
-                                    </div>
                                 </Show>
 
                                 <Show when={!manualMode()}>
-                                    <div class="flex flex-col gap-2">
-                                        <div class="flex items-center justify-between">
-                                            <div class="text-xs text-gray-500 flex items-center gap-1">
-                                                <span class={coords() ? "text-green-600 font-bold" : "text-red-500 font-medium"}>
-                                                    {coords() ? "✅ Lokasi Terkunci" : "❌ Menunggu Lokasi..."}
-                                                </span>
-                                            </div>
-                                            <div class="flex gap-1">
-                                                <Button 
-                                                    type="button" 
-                                                    variant="outlined" 
-                                                    size="sm" 
-                                                    onClick={() => { console.log('Refresh clicked'); getLocation(); }}
-                                                    disabled={locationLoading()}
-                                                >
-                                                    {locationLoading() ? "Mencari..." : "Refresh"}
-                                                </Button>
-                                                <Button 
-                                                    type="button" 
-                                                    variant="text" 
-                                                    size="sm" 
-                                                    color="warning"
-                                                    onClick={() => { console.log('Test clicked'); simulateLocation(); }}
-                                                    disabled={locationLoading()}
-                                                    class="text-xs px-2"
-                                                >
-                                                    Test
-                                                </Button>
-                                            </div>
-                                        </div>
-                                        {/* Debug info for user */}
-                                        <div class="text-[10px] text-gray-500 font-mono bg-gray-100 p-2 rounded border border-gray-200 break-words whitespace-pre-wrap">
-                                            LOG: {debugStatus()}
-                                        </div>
+                                    <div class={`p-3 rounded-lg text-sm flex items-center gap-2 transition-colors ${
+                                        coords() ? "bg-success-50 text-success-700 border border-success-100" : 
+                                        locationLoading() ? "bg-primary-50 text-primary-700 border border-primary-100" : 
+                                        "bg-error-50 text-error-700 border border-error-100"
+                                    }`}>
+                                        <Show when={locationLoading()} fallback={
+                                            <Show when={coords()} fallback={
+                                                <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                            }>
+                                                <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </Show>
+                                        }>
+                                            <svg class="animate-spin w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                        </Show>
                                         
-                                        {/* Diagnostics Panel (Analysis) */}
-                                        <div class="mt-2 p-2 bg-blue-50 border border-blue-100 rounded text-[10px] text-blue-800 font-mono">
-                                            <strong>🔍 DIAGNOSTICS (Client-Side):</strong><br/>
-                                            <Show when={geoState().ready} fallback="Loading check...">
-                                                • Secure Context: {geoState().secure ? '✅ YES' : '❌ NO (Geo blocked in HTTP)'}<br/>
-                                                • Navigator.geo: {geoState().hasGeo ? '✅ Available' : '❌ Not Found'}<br/>
-                                                • Protocol: {geoState().protocol}<br/>
-                                                • Host: {geoState().host}<br/>
-                                            </Show>
-                                            <Show when={!geoState().secure && geoState().ready}>
-                                                <span class="text-red-600 font-bold block mt-1">
-                                                    ⚠️ PENYEBAB: Browser memblokir Lokasi karena website tidak HTTPS (atau Localhost).
-                                                    <br/>Gunakan 'Mode Manual' di atas untuk lanjut.
-                                                </span>
-                                            </Show>
+                                        <div class="flex-1 truncate">
+                                            {coords() 
+                                                ? `GPS Terkunci: ${coords()?.lat.toFixed(5)}, ${coords()?.lng.toFixed(5)}`
+                                                : locationLoading() 
+                                                    ? "Sedang mendeteksi lokasi..." 
+                                                    : "Gagal mendeteksi lokasi."
+                                            }
                                         </div>
                                     </div>
                                 </Show>
