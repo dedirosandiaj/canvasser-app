@@ -145,7 +145,7 @@ export function TextField(props: TextFieldProps) {
                         'flex-1 w-full py-2.5 px-3 bg-transparent',
                         'text-darkText placeholder:text-gray-400',
                         'outline-none border-0',
-                        'text-sm',
+                        'text-base', // 16px to prevent iOS zoom
                         !props.prefix && 'pl-3',
                         !props.suffix && 'pr-3',
                         props.inputClass

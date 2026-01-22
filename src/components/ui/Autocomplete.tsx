@@ -152,8 +152,8 @@ export function Autocomplete(props: AutocompleteProps) {
                     onInput={handleInput}
                     onKeyDown={handleKeyDown}
                     class={cn(
-                        'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-md',
-                        'text-sm text-gray-900 placeholder:text-gray-400',
+                         'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-md',
+                        'text-base text-gray-900 placeholder:text-gray-400',
                         'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary',
                         'transition-colors',
                         props.disabled && 'opacity-50 cursor-not-allowed'
