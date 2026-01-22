@@ -58,8 +58,9 @@ export default function CanvasserForm() {
             if (response.ok) {
                 const data = await response.json();
                 const address = data.address || {};
-                const kota = address.city || address.municipality || address.town || address.county || address.regency || '';
-                const kecamatan = address.suburb || address.subdistrict || address.village || address.neighbourhood || '';
+                // User Feedback: county -> Kota, municipality -> Kecamatan
+                const kota = address.city || address.county || address.regency || address.town || '';
+                const kecamatan = address.municipality || address.suburb || address.subdistrict || address.village || address.neighbourhood || '';
 
                 if (kota || kecamatan) {
                     setFormData(prev => ({ ...prev, kota, kecamatan }));
