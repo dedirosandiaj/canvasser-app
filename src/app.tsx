@@ -84,7 +84,7 @@ export default function App() {
                     
                     {/* PWA Manifest & Icons */}
                     <Link rel="manifest" href="/manifest.webmanifest" />
-                    <Link rel="apple-touch-icon" href="/favicon.ico.ico" />
+                    <Link rel="apple-touch-icon" href="/favicon.ico" />
                     <Meta name="apple-mobile-web-app-capable" content="yes" />
                     <Meta name="apple-mobile-web-app-status-bar-style" content="black" />
 
