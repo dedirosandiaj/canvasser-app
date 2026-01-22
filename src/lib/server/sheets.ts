@@ -1,12 +1,7 @@
 'use server';
 
-import { config } from 'dotenv';
-import { resolve } from 'path';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
-
-// Load environment variables at runtime
-config({ path: resolve(process.cwd(), '.env') });
 
 // Types
 export interface VisitData {

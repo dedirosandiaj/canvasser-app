@@ -1,13 +1,8 @@
 'use server';
 
-import { config } from 'dotenv';
-import { resolve } from 'path';
 import { google } from 'googleapis';
 import { Readable } from 'stream';
 import sharp from 'sharp';
-
-// Load environment variables at runtime
-config({ path: resolve(process.cwd(), '.env') });
 
 // NOTE: Ensure environment variables (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN) 
 // are available in the running environment (checked at startup by app.config.ts / dotenv).
