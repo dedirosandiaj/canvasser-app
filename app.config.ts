@@ -11,7 +11,7 @@ if (result.error && (result.error as any).code !== 'ENOENT') {
 
 export default defineConfig({
     server: {
-        preset: "node-server"
+        preset: "vercel"
     },
     vite: {
         server: {
