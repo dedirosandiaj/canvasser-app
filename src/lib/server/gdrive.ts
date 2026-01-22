@@ -1,11 +1,6 @@
 'use server';
 
-import { google } from 'googleapis';
-import { Readable } from 'stream';
-import sharp from 'sharp';
-
-// NOTE: Ensure environment variables (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN) 
-// are available in the running environment (checked at startup by app.config.ts / dotenv).
+// NOTE: Ensure environment variables are available
 
 // Image MIME types that can be compressed
 const COMPRESSIBLE_IMAGE_TYPES = [
@@ -18,18 +13,18 @@ const COMPRESSIBLE_IMAGE_TYPES = [
 ];
 
 /**
- * Compress an image using Sharp
- * Converts to WebP format with 80% quality and resizes to max 1920px width
+ * Compress an image using Sharp (Dynamically imported)
  */
 async function compressImage(
     buffer: Buffer,
     mimeType: string
 ): Promise<{ buffer: Uint8Array; mimeType: string }> {
     try {
+        const sharp = (await import('sharp')).default;
         const image = sharp(buffer);
         const metadata = await image.metadata();
 
-        // Resize if width is larger than 1920px, maintaining aspect ratio
+        // Resize if width is larger than 1920px
         let processedImage = image;
         if (metadata.width && metadata.width > 1920) {
             processedImage = image.resize(1920, undefined, {
@@ -38,7 +33,7 @@ async function compressImage(
             });
         }
 
-        // Convert to WebP with 80% quality
+        // Convert to WebP
         const compressedBuffer = await processedImage
             .webp({ quality: 80 })
             .toBuffer();
@@ -57,31 +52,6 @@ async function compressImage(
 }
 
 /**
- * Helper to get authenticated OAuth2 client
- */
-export function getAuthClient() {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-
-    if (!clientId || !clientSecret || !refreshToken) {
-        throw new Error('Missing Google OAuth2 credentials');
-    }
-
-    const oAuth2Client = new google.auth.OAuth2(
-        clientId,
-        clientSecret,
-        'https://developers.google.com/oauthplayground'
-    );
-
-    oAuth2Client.setCredentials({
-        refresh_token: refreshToken
-    });
-
-    return oAuth2Client;
-}
-
-/**
  * Upload a file to Google Drive and return the public link
  */
 export async function uploadToGoogleDrive(
@@ -93,9 +63,27 @@ export async function uploadToGoogleDrive(
     console.log(`📤 Uploading file to Google Drive: ${fileName}`);
 
     try {
-        // Validate environment variables - implicit in getAuthClient
+        const { google } = await import('googleapis');
+        const { Readable } = await import('stream');
+        
+        const clientId = process.env.GOOGLE_CLIENT_ID;
+        const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+        const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
 
-        const auth = getAuthClient();
+        if (!clientId || !clientSecret || !refreshToken) {
+            throw new Error('Missing Google OAuth2 credentials');
+        }
+
+        const auth = new google.auth.OAuth2(
+            clientId,
+            clientSecret,
+            'https://developers.google.com/oauthplayground'
+        );
+
+        auth.setCredentials({
+            refresh_token: refreshToken
+        });
+
         const drive = google.drive({ version: 'v3', auth });
 
         let buffer = Buffer.from(fileBuffer);
@@ -105,6 +93,7 @@ export async function uploadToGoogleDrive(
         // Compress image if it's a compressible type
         if (COMPRESSIBLE_IMAGE_TYPES.includes(mimeType)) {
             console.log(`🖼️ Compressing image: ${fileName}`);
+            // Use dynamic import wrapper
             const compressed = await compressImage(buffer, mimeType);
             buffer = Buffer.from(compressed.buffer);
             finalMimeType = compressed.mimeType;

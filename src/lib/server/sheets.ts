@@ -1,8 +1,5 @@
 'use server';
 
-import { GoogleSpreadsheet } from 'google-spreadsheet';
-import { JWT } from 'google-auth-library';
-
 // Types
 export interface VisitData {
     nama_sales: string;
@@ -30,6 +27,10 @@ async function getDoc() {
     if (!hasServiceAccount) {
         throw new Error('Server configuration error: Missing Google Sheets credentials');
     }
+
+    // Dynamic Imports
+    const { JWT } = await import('google-auth-library');
+    const { GoogleSpreadsheet } = await import('google-spreadsheet');
 
     const serviceAccountAuth = new JWT({
         email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,

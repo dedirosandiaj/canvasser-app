@@ -3,10 +3,10 @@ import { config } from "dotenv";
 import { resolve } from "path";
 
 const result = config({ path: resolve(process.cwd(), '.env') });
-console.log('[app.config.ts] Dotenv loaded. CWD:', process.cwd());
-console.log('[app.config.ts] GOOGLE_SHEET_ID:', process.env.GOOGLE_SHEET_ID ? 'Found' : 'NOT FOUND');
-if (result.error) {
-    console.error('[app.config.ts] Dotenv error:', result.error);
+if (result.error && (result.error as any).code !== 'ENOENT') {
+     console.error('[app.config.ts] Dotenv error:', result.error);
+} else {
+    console.log('[app.config.ts] Environment check:', process.env.GOOGLE_SHEET_ID ? 'Variables Loaded' : 'No .env found (Using system env)');
 }
 
 export default defineConfig({
