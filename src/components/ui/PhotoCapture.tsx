@@ -54,17 +54,39 @@ export function PhotoCapture(props: PhotoCaptureProps) {
     const capturePhoto = () => {
         if (!videoRef || !stream()) return;
 
-        const canvas = document.createElement('canvas');
-        if (videoRef.videoWidth === 0 || videoRef.videoHeight === 0) {
-            return;
+        const videoWidth = videoRef.videoWidth;
+        const videoHeight = videoRef.videoHeight;
+        
+        if (videoWidth === 0 || videoHeight === 0) return;
+
+        // Target Aspect Ratio: 9:16 (Phone Portrait)
+        const TARGET_RATIO = 9 / 16;
+        const videoRatio = videoWidth / videoHeight;
+
+        let cropWidth, cropHeight, sx, sy;
+
+        if (videoRatio > TARGET_RATIO) {
+            // Video is wider -> Crop width (sides)
+            cropHeight = videoHeight;
+            cropWidth = videoHeight * TARGET_RATIO;
+            sx = (videoWidth - cropWidth) / 2;
+            sy = 0;
+        } else {
+            // Video is taller -> Crop height (top/bottom)
+            cropWidth = videoWidth;
+            cropHeight = videoWidth / TARGET_RATIO;
+            sx = 0;
+            sy = (videoHeight - cropHeight) / 2;
         }
 
-        canvas.width = videoRef.videoWidth;
-        canvas.height = videoRef.videoHeight;
+        const canvas = document.createElement('canvas');
+        canvas.width = cropWidth;
+        canvas.height = cropHeight;
         
         const ctx = canvas.getContext('2d');
         if (ctx) {
-            ctx.drawImage(videoRef, 0, 0);
+            ctx.drawImage(videoRef, sx, sy, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+            
             canvas.toBlob((blob) => {
                 if (blob) {
                     const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
@@ -143,7 +165,7 @@ export function PhotoCapture(props: PhotoCaptureProps) {
                     <img
                         src={props.previewUrl!}
                         alt="Preview"
-                        class="w-full h-48 object-cover rounded-lg border border-gray-200"
+                        class="w-full aspect-[9/16] object-cover rounded-lg border border-gray-200 bg-gray-100"
                     />
                     <button
                         type="button"
