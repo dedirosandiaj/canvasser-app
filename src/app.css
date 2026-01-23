@@ -188,3 +188,8 @@ input[type="checkbox"] {
 .scrollnavbar {
     height: calc(100vh - 200px);
 }
+
+/* SweetAlert Customization */
+div.swal2-timer-progress-bar {
+    background-color: #e11d48 !important;
+}

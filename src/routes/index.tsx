@@ -2,20 +2,25 @@ import { createSignal, Show, onMount, createEffect } from 'solid-js';
 import imageCompression from 'browser-image-compression';
 import { submitVisit, type VisitData } from '~/lib/server/sheets';
 import { uploadToGoogleDrive } from '~/lib/server/gdrive';
-import { TextField, Button, Card, Alert, PhotoCapture, SalesAutocomplete } from '~/components/ui';
+import { TextField, Button, Card, Alert, PhotoCapture, SalesAutocomplete, Select, Autocomplete } from '~/components/ui';
 import Swal from 'sweetalert2';
 
 export default function CanvasserForm() {
 
     // Small SweetAlert Configuration
+    // Small SweetAlert Configuration
     const smallSwal = Swal.mixin({
         width: '320px',
         customClass: {
-            popup: 'text-sm',
-            title: 'text-lg font-bold',
-            confirmButton: 'text-sm px-4 py-2'
+            popup: 'text-sm rounded-none',
+            title: 'text-lg font-bold text-gray-900',
+            confirmButton: 'text-sm px-6 py-2.5 rounded-none font-medium shadow-sm',
+            htmlContainer: 'text-gray-600'
         },
-        buttonsStyling: true
+        buttonsStyling: true,
+        confirmButtonColor: '#e11d48', // Primary Brand Color
+        background: '#ffffff',
+        showCloseButton: false
     });
 
     const [manualMode, setManualMode] = createSignal(false);
@@ -135,7 +140,7 @@ export default function CanvasserForm() {
             }
         } catch (e: any) {
             console.error('BigDataCloud Failed:', e);
-            setDebugStatus(prev => prev + `\n❌ Gagal ambil alamat. Isi manual.`);
+            setDebugStatus(prev => prev + `\n❌ Sistem Gagal ambil alamat. Mohon Isi manual.`);
         } finally {
             setLocationLoading(false);
         }
@@ -215,7 +220,7 @@ export default function CanvasserForm() {
                 
                 // Step 1: Coords Acquired
                 const coordMsg = `✅ 1. Koordinat OK (GPS): ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-                setDebugStatus(coordMsg + '\n⏳ 2. Mengambil Data Alamat...');
+                setDebugStatus(coordMsg + '\n⏳ 2. Mengambil Data Alamat Saat ini...');
                 
                 setCoords({ lat, lng });
                 
@@ -265,13 +270,33 @@ export default function CanvasserForm() {
         setError('');
         setSuccess(false);
 
-        // Validation
-        if (!formData().nama_sales || !formData().nama_toko || !formData().nama_pic || !formData().status || !photoFile()) {
+        // Validation: Collect all missing fields
+        const missingFields: string[] = [];
+        const data = formData();
+
+        if (!data.nama_sales) missingFields.push('Nama Sales');
+        if (!data.nama_toko) missingFields.push('Nama Toko');
+        if (!data.nama_pic) missingFields.push('Nama PIC');
+        if (!data.status) missingFields.push('Status Kunjungan');
+        
+        // Conditional Validation
+        if (data.status === 'Follow-Up' && !data.no_telp) {
+            missingFields.push('Nomor Telepon (Wajib untuk Follow-Up)');
+        }
+
+        if (!photoFile()) missingFields.push('Foto Toko');
+
+        // Show comprehensive alert if there are missing fields
+        if (missingFields.length > 0) {
+             const listHtml = `<ul style="text-align: left; margin-left: 20px;">${missingFields.map(field => `<li>• ${field}</li>`).join('')}</ul>`;
+             
              smallSwal.fire({
                 icon: 'error',
                 title: 'Data Belum Lengkap',
-                text: 'Mohon isi semua field yang wajib dan pastikan foto sudah diambil.',
-                confirmButtonText: 'OK'
+                html: `<p>Mohon lengkapi data berikut:</p><br/>${listHtml}`,
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true
             });
             return;
         }
@@ -282,20 +307,14 @@ export default function CanvasserForm() {
                  icon: 'error',
                  title: 'Lokasi Kosong',
                  text: 'Lokasi wajib diisi. Mohon aktifkan GPS atau gunakan "Mode Manual".',
-                 confirmButtonText: 'OK'
+                 showConfirmButton: false,
+                 timer: 3000,
+                 timerProgressBar: true
              });
             return;
         }
 
-        if (formData().status === 'Follow-Up' && !formData().no_telp) {
-             smallSwal.fire({
-                 icon: 'error',
-                 title: 'Nomor Telepon Kosong',
-                 text: 'Nomor telepon wajib diisi untuk status Follow-Up.',
-                 confirmButtonText: 'OK'
-             });
-            return;
-        }
+
 
         setLoading(true);
 
@@ -346,7 +365,8 @@ export default function CanvasserForm() {
                 icon: 'success',
                 title: 'Berhasil!',
                 text: 'Data kunjungan berhasil disimpan.',
-                confirmButtonText: 'OK'
+                showConfirmButton: false,
+                timer: 1500
             });
             
             // Clear storage and reload
@@ -378,7 +398,7 @@ export default function CanvasserForm() {
                     <Alert variant="filled" severity="error">{error()}</Alert>
                 </Show>
 
-                <form onSubmit={handleSubmit} class="space-y-4">
+                <form onSubmit={handleSubmit} class="space-y-4" novalidate>
                     <Card padding="md">
                         <div class="space-y-4">
                             {/* Sales Name */}
@@ -397,7 +417,7 @@ export default function CanvasserForm() {
                                 fullWidth
                             />
                             <TextField
-                                label="Nama PIC"
+                                label="Nama Agen"
                                 value={formData().nama_pic}
                                 onInput={(e) => setFormData({ ...formData(), nama_pic: e.currentTarget.value })}
                                 required
@@ -405,19 +425,19 @@ export default function CanvasserForm() {
                             />
 
                             {/* Status & Phone */}
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Status Kunjungan *</label>
-                                <select
-                                    class="w-full rounded-md border border-gray-300 p-2"
-                                    value={formData().status}
-                                    onChange={(e) => setFormData({ ...formData(), status: e.currentTarget.value })}
-                                    required
-                                >
-                                    <option value="">Select Status</option>
-                                    <option value="Follow-Up">Follow-Up</option>
-                                    <option value="Tidak Tertarik">Tidak Tertarik</option>
-                                </select>
-                            </div>
+                            <Autocomplete
+                                label="Status Kunjungan"
+                                placeholder="Select Status"
+                                value={formData().status}
+                                onChange={(value) => setFormData({ ...formData(), status: value })}
+                                options={[
+                                    { value: 'Follow-Up', label: 'Follow-Up' },
+                                    { value: 'Tidak Tertarik', label: 'Tidak Tertarik' },
+                                    { value: 'Activated', label: 'Activated' }
+                                ]}
+                                required
+                                fullWidth
+                            />
 
                             <Show when={formData().status === 'Follow-Up'}>
                                 <TextField
@@ -460,6 +480,7 @@ export default function CanvasserForm() {
                                 }}
                                 previewUrl={previewUrl()}
                                 required
+                                cameraOnly
                             />
 
                             {/* Keterangan */}

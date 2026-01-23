@@ -4,6 +4,7 @@
 // Base Components
 export { Button, type ButtonProps, type ButtonVariant, type ButtonSize, type ButtonColor } from './Button';
 export { TextField, type TextFieldProps, type ValidationState } from './TextField';
+export { Select, type SelectProps } from './Select';
 export { StatusBadge, type StatusBadgeProps, type StatusType, type BadgeSize } from './StatusBadge';
 
 // Card Component
