@@ -29,15 +29,15 @@ export function PhotoCapture(props: PhotoCaptureProps) {
         try {
             setCameraError('');
             const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' }
+                video: { 
+                    facingMode: { ideal: 'environment' } 
+                }
             });
             setStream(mediaStream);
             setIsCameraOpen(true);
         } catch (err: any) {
             console.error("Camera Error:", err);
             setCameraError('Gagal membuka kamera: ' + (err.message || 'Permission denied'));
-            // Optionally fallback to input file if camera fails? 
-            // But user insisted on camera. Let's just show error for now.
              alert("Gagal mengakses kamera. Pastikan izin kamera diberikan.");
         }
     };
@@ -54,42 +54,16 @@ export function PhotoCapture(props: PhotoCaptureProps) {
     const capturePhoto = () => {
         if (!videoRef || !stream()) return;
 
-        const videoWidth = videoRef.videoWidth;
-        const videoHeight = videoRef.videoHeight;
-        
-        if (videoWidth === 0 || videoHeight === 0) return;
-
-        // Target Aspect Ratio: 9:16 (Phone Portrait)
-        const TARGET_RATIO = 9 / 16;
-        const videoRatio = videoWidth / videoHeight;
-
-        let cropWidth, cropHeight, sx, sy;
-
-        if (videoRatio > TARGET_RATIO) {
-            // Video is wider -> Crop width (sides)
-            cropHeight = videoHeight;
-            cropWidth = videoHeight * TARGET_RATIO;
-            sx = (videoWidth - cropWidth) / 2;
-            sy = 0;
-        } else {
-            // Video is taller -> Crop height (top/bottom)
-            cropWidth = videoWidth;
-            cropHeight = videoWidth / TARGET_RATIO;
-            sx = 0;
-            sy = (videoHeight - cropHeight) / 2;
-        }
-
         const canvas = document.createElement('canvas');
-        canvas.width = cropWidth;
-        canvas.height = cropHeight;
-        
+        canvas.width = videoRef.videoWidth;
+        canvas.height = videoRef.videoHeight;
         const ctx = canvas.getContext('2d');
+        
         if (ctx) {
-            ctx.drawImage(videoRef, sx, sy, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
-            
+            ctx.drawImage(videoRef, 0, 0);
             canvas.toBlob((blob) => {
                 if (blob) {
-                    const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                    const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
                     props.onChange(file);
                     stopCamera();
                 }
@@ -97,125 +71,109 @@ export function PhotoCapture(props: PhotoCaptureProps) {
         }
     };
 
-    onCleanup(() => {
-        stopCamera();
-    });
-
-    const handleFileChange = (e: Event & { currentTarget: HTMLInputElement }) => {
-        const file = e.currentTarget.files?.[0] || null;
-        if (file) {
-            props.onChange(file);
-        }
-    };
-
-    const clearPhoto = () => {
-        props.onChange(null);
-        if (fileInputRef) fileInputRef.value = '';
-    };
-
     return (
-        <div class={`space-y-3 ${props.class || ''}`}>
-            <label class="block text-sm font-medium text-gray-700">
-                {props.label}
-                <Show when={props.required}>
-                    <span class="text-red-500 ml-0.5">*</span>
-                </Show>
-            </label>
+        <div class={props.class}>
+            <Show when={props.label}>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    {props.label} {props.required && <span class="text-red-500">*</span>}
+                </label>
+            </Show>
 
-            {/* Hidden Input for Gallery (only used if NOT cameraOnly) */}
-            <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                class="hidden"
-                onChange={handleFileChange}
-            />
-
-            {/* Action Buttons */}
-            <div class="flex gap-2">
-                <button
-                    type="button"
-                    onClick={startCamera}
-                    class="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors"
-                >
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    Ambil Foto
-                </button>
-                
-                <Show when={!props.cameraOnly}>
-                    <button
-                        type="button"
-                        onClick={() => fileInputRef?.click()}
-                        class="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
-                    >
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        Pilih dari Galeri
-                    </button>
-                </Show>
+            <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md relative transition-colors bg-white dark:bg-gray-800 hover:border-blue-500 cursor-pointer"
+                 onClick={() => !props.value && !isCameraOpen() ? startCamera() : null}
+            >
+                <div class="space-y-1 text-center w-full">
+                    <Show when={props.value || props.previewUrl} fallback={
+                        <div class="flex flex-col items-center">
+                            <div class="mx-auto h-12 w-12 text-gray-400">
+                                <svg class="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </div>
+                            <div class="flex text-sm text-gray-600 dark:text-gray-400 justify-center mt-2">
+                                <span class="relative rounded-md font-medium text-blue-600 hover:text-blue-500">
+                                    Ambil Foto
+                                </span>
+                            </div>
+                        </div>
+                    }>
+                        <div class="relative flex justify-center">
+                           <img 
+                                src={props.value ? URL.createObjectURL(props.value) : props.previewUrl!} 
+                                class="h-48 object-contain rounded-md" 
+                            />
+                            <button 
+                                type="button"
+                                class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    props.onChange(null);
+                                }}
+                            >
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </Show>
+                </div>
             </div>
 
-            {/* Preview (Only shown when not capturing) */}
-            <Show when={props.previewUrl}>
-                <div class="relative">
-                    <img
-                        src={props.previewUrl!}
-                        alt="Preview"
-                        class="w-full aspect-[9/16] object-cover rounded-lg border border-gray-200 bg-gray-100"
-                    />
-                    <button
-                        type="button"
-                        onClick={clearPhoto}
-                        class="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                    >
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
+             <input
+                ref={fileInputRef}
+                type="file"
+                class="hidden"
+                accept="image/*"
+                onChange={(e) => {
+                    if (e.currentTarget.files && e.currentTarget.files[0]) {
+                        props.onChange(e.currentTarget.files[0]);
+                    }
+                }}
+            />
+
+            <Show when={cameraError()}>
+                <p class="mt-2 text-sm text-red-600">{cameraError()}</p>
+            </Show>
+            
+             <Show when={props.helperText}>
+                <p class="mt-2 text-sm text-gray-500">{props.helperText}</p>
             </Show>
 
-            <Show when={props.value}>
-                <p class="text-xs text-green-600 flex items-center gap-1">
-                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                    </svg>
-                    {props.value!.name}
-                </p>
-            </Show>
-
-            <Show when={props.helperText}>
-                <p class="text-xs text-gray-500">{props.helperText}</p>
-            </Show>
-
-            {/* Camera Overlay */}
-            <Show when={isCameraOpen() && stream()}>
-                <div class="fixed inset-0 z-[100] bg-black flex flex-col justify-between p-4">
-                    {/* Header */}
-                    <div class="flex justify-end pt-2">
-                        <button type="button" onClick={stopCamera} class="bg-gray-800/50 text-white p-2 rounded-full">
+            <Show when={isCameraOpen()}>
+                <div class="fixed inset-0 z-[100] bg-black flex flex-col">
+                    <div class="flex justify-between items-center p-4 bg-black/50 absolute top-0 w-full z-10">
+                        <span class="text-white font-bold">Ambil Foto</span>
+                         <button 
+                            type="button"
+                            onClick={stopCamera} 
+                            class="text-white p-2"
+                        >
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
                     </div>
-                    
+
                     {/* Viewport */}
                     <div class="flex-1 flex items-center justify-center overflow-hidden my-4 relative rounded-xl border border-gray-700">
                         <video 
                             ref={(el) => {
                                 videoRef = el;
                                 el.srcObject = stream()!;
-                                el.play();
+                                // iOS requires explicit play call sometimes
+                                el.play().catch(e => console.log("Play error:", e));
                             }}
                             class="absolute w-full h-full object-cover"
                             autoplay
                             playsinline
+                            // @ts-ignore
+                            webkit-playsinline="true"
                             muted
+                            onLoadedMetadata={(e) => {
+                                // Double assurance for iOS
+                                e.currentTarget.play().catch(e => console.log("Metadata play error:", e));
+                            }}
                         />
                     </div>
 
