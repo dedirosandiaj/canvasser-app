@@ -560,6 +560,10 @@ export default function CanvasserForm() {
                                     onInput={(e) => setFormData({ ...formData(), kota: e.currentTarget.value })}
                                     fullWidth
                                     placeholder={locationLoading() ? "Loading..." : "Kota"}
+                                    readonly={!(
+                                        (formData().kota && formData().kecamatan && formData().kota === formData().kecamatan) ||
+                                        (formData().kota && formData().provinsi && formData().kota === formData().provinsi)
+                                    )}
                                 />
                                 <TextField
                                     label="Kecamatan"
@@ -567,6 +571,10 @@ export default function CanvasserForm() {
                                     onInput={(e) => setFormData({ ...formData(), kecamatan: e.currentTarget.value })}
                                     fullWidth
                                     placeholder={locationLoading() ? "Loading..." : "Kecamatan"}
+                                    readonly={!(
+                                        (formData().kota && formData().kecamatan && formData().kota === formData().kecamatan) ||
+                                        (formData().kecamatan && formData().provinsi && formData().kecamatan === formData().provinsi)
+                                    )}
                                 />
                             </div>
                             
@@ -576,6 +584,10 @@ export default function CanvasserForm() {
                                 onInput={(e) => setFormData({ ...formData(), provinsi: e.currentTarget.value })}
                                 fullWidth
                                 placeholder={locationLoading() ? "Loading..." : "Provinsi"}
+                                readonly={!(
+                                    (formData().provinsi && formData().kota && formData().provinsi === formData().kota) ||
+                                    (formData().provinsi && formData().kecamatan && formData().provinsi === formData().kecamatan)
+                                )}
                             />
 
 
