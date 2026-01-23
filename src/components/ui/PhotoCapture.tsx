@@ -108,7 +108,14 @@ export function PhotoCapture(props: PhotoCaptureProps) {
                     const logoX = img.width - margin - logoWidth;
                     const logoY = img.height - margin - logoHeight;
 
+                    // Apply styles for watermark logo
+                    ctx.save(); // Save current state
+                    // ctx.filter = 'grayscale(100%)';
+                    ctx.globalAlpha = 0.2; // 70% Opacity
+
                     ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
+
+                    ctx.restore(); // Restore state (removes filter and alpha)
 
                     // Finalize
                     canvas.toBlob((blob) => {
