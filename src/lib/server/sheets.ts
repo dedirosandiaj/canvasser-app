@@ -6,8 +6,9 @@ export interface VisitData {
     nama_toko: string;
     nama_pic: string;
     no_telp: string;
-    kota: string;
     kecamatan: string;
+    kota: string;
+    provinsi: string;
     status: 'Follow-Up' | 'Tidak Tertarik';
     link_foto: string;
     lat: string;
@@ -97,7 +98,7 @@ export async function submitVisit(data: VisitData): Promise<{ success: boolean; 
             console.log(`Title "${sheetTitle}" not found, creating new sheet...`);
             sheet = await doc.addSheet({ title: sheetTitle });
             await sheet.loadCells('A1:K1');
-            const headers = ['Timestamp', 'Nama Sales', 'Nama Toko', 'Nama PIC', 'No Telp', 'Kota', 'Kec', 'Status', 'Link Foto', 'Lat/Long', 'Keterangan'];
+            const headers = ['Timestamp', 'Nama Sales', 'Nama Toko', 'Nama PIC', 'No Telp', 'Kec', 'Kota', 'Provinsi', 'Status', 'Link Foto', 'Lat/Long', 'Keterangan'];
             await sheet.setHeaderRow(headers);
         }
 
@@ -107,8 +108,9 @@ export async function submitVisit(data: VisitData): Promise<{ success: boolean; 
             data.nama_toko,
             data.nama_pic,
             data.no_telp,
-            data.kota,
             data.kecamatan,
+            data.kota,
+            data.provinsi,
             data.status,
             data.link_foto,
             `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lng}`,

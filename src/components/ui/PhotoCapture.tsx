@@ -17,6 +17,7 @@ interface PhotoCaptureProps {
     coords?: { lat: number; lng: number } | null;
     kota?: string;
     kecamatan?: string;
+    provinsi?: string;
 }
 
 export function PhotoCapture(props: PhotoCaptureProps) {
@@ -42,8 +43,8 @@ export function PhotoCapture(props: PhotoCaptureProps) {
                 ctx.drawImage(img, 0, 0);
 
                 // 2. Draw Bottom Overlay (Gradient/Semi-transparent black)
-                // Increase gradient height to accommodate more text
-                const gradientHeight = img.height * 0.4; 
+                // Increase gradient height to accommodate more text (timestamp, latlong, kec/kota, prov, source)
+                const gradientHeight = img.height * 0.45; 
                 const gradient = ctx.createLinearGradient(0, img.height - gradientHeight, 0, img.height);
                 gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
                 gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.6)');
@@ -53,7 +54,7 @@ export function PhotoCapture(props: PhotoCaptureProps) {
                 ctx.fillRect(0, img.height - gradientHeight, img.width, gradientHeight);
 
                 // 3. Watermark Info
-                const fontSize = Math.max(16, img.width * 0.025); // Slightly smaller font to fit more
+                const fontSize = Math.max(16, img.width * 0.025); 
                 ctx.font = `bold ${fontSize}px sans-serif`;
                 ctx.fillStyle = 'white';
                 ctx.textBaseline = 'bottom';
@@ -62,8 +63,7 @@ export function PhotoCapture(props: PhotoCaptureProps) {
                 let currentY = img.height - margin;
                 const lineHeight = fontSize * 1.4;
 
-                // Detect Source (Camera vs Gallery)
-                // Heuristic: If file was modified within last 3 minutes, assume Camera/New. Else Gallery.
+                // Detect Source
                 const isRecent = (Date.now() - file.lastModified) < 3 * 60 * 1000;
                 const sourceText = isRecent ? "Source: Kamera" : "Source: Galeri";
                 
@@ -92,8 +92,14 @@ export function PhotoCapture(props: PhotoCaptureProps) {
                     currentY -= lineHeight;
                 }
 
-                // Line 4: Source
-                ctx.fillStyle = isRecent ? '#a7f3d0' : '#fde68a'; // Greenish for Camera, Yellowish for Gallery
+                // Line 4: Provinsi
+                if (props.provinsi) {
+                    ctx.fillText(props.provinsi, margin, currentY);
+                    currentY -= lineHeight;
+                }
+
+                // Line 5: Source
+                ctx.fillStyle = isRecent ? '#a7f3d0' : '#fde68a';
                 ctx.fillText(sourceText, margin, currentY);
                 ctx.fillStyle = 'white'; // Reset
                 

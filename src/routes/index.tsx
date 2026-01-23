@@ -34,6 +34,7 @@ export default function CanvasserForm() {
         no_telp: '',
         kota: '',
         kecamatan: '',
+        provinsi: '',
         status: '',
         keterangan: '',
     });
@@ -106,10 +107,11 @@ export default function CanvasserForm() {
                 // User Feedback: county -> Kota, municipality -> Kecamatan
                 const kota = address.city || address.county || address.regency || address.town || '';
                 const kecamatan = address.municipality || address.suburb || address.subdistrict || address.village || address.neighbourhood || '';
+                const provinsi = address.state || address.region || '';
 
-                if (kota || kecamatan) {
-                    setFormData(prev => ({ ...prev, kota, kecamatan }));
-                    setDebugStatus(prev => prev + '\n✅ 2. Alamat: ' + (kota || 'Kota?') + ', ' + (kecamatan || 'Kec?'));
+                if (kota || kecamatan || provinsi) {
+                    setFormData(prev => ({ ...prev, kota, kecamatan, provinsi }));
+                    setDebugStatus(prev => prev + '\n✅ 2. Alamat: ' + (kota || 'Kota?') + ', ' + (kecamatan || 'Kec?') + ', ' + (provinsi || 'Prov?'));
                     return; // Success
                 }
             }
@@ -129,11 +131,13 @@ export default function CanvasserForm() {
                 const data = await response.json();
                 const kota = data.city || data.locality || '';
                 const kecamatan = ''; 
+                const provinsi = data.principalSubdivision || '';
 
                 setFormData(prev => ({ 
                     ...prev, 
                     kota: kota || prev.kota, 
-                    kecamatan: kecamatan || prev.kecamatan 
+                    kecamatan: kecamatan || prev.kecamatan,
+                    provinsi: provinsi || prev.provinsi
                 }));
                 setDebugStatus(prev => prev + `\n✅ 2. Alamat (Backup): ${kota}`);
                 return;
@@ -162,12 +166,14 @@ export default function CanvasserForm() {
                 const lat = data.latitude;
                 const lng = data.longitude;
                 const kota = data.city || data.locality || '';
+                const provinsi = data.principalSubdivision || '';
                 
                 // Update State
                 setCoords({ lat, lng });
                 setFormData(prev => ({ 
                     ...prev, 
-                    kota: kota || prev.kota 
+                    kota: kota || prev.kota,
+                    provinsi: provinsi || prev.provinsi
                 }));
                 
                 setDebugStatus(prev => prev + `\n✅ Lokasi Ditemukan (Estimasi IP): ${kota}\nLat: ${lat}, Lng: ${lng}`);
@@ -468,6 +474,14 @@ export default function CanvasserForm() {
                                     placeholder={locationLoading() ? "Loading..." : "Kecamatan"}
                                 />
                             </div>
+                            
+                            <TextField
+                                label="Provinsi"
+                                value={formData().provinsi}
+                                onInput={(e) => setFormData({ ...formData(), provinsi: e.currentTarget.value })}
+                                fullWidth
+                                placeholder={locationLoading() ? "Loading..." : "Provinsi"}
+                            />
 
 
                             {/* Photo */}
