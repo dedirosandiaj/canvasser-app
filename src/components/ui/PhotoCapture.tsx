@@ -3,7 +3,7 @@
  * File input with camera capture option for mobile devices
  */
 
-import { Show, createSignal, onCleanup } from 'solid-js';
+import { Show } from 'solid-js';
 
 interface PhotoCaptureProps {
     label: string;
@@ -18,58 +18,6 @@ interface PhotoCaptureProps {
 
 export function PhotoCapture(props: PhotoCaptureProps) {
     let fileInputRef: HTMLInputElement | undefined;
-    
-    // Camera State
-    const [isCameraOpen, setIsCameraOpen] = createSignal(false);
-    const [stream, setStream] = createSignal<MediaStream | null>(null);
-    const [cameraError, setCameraError] = createSignal('');
-    let videoRef: HTMLVideoElement | undefined;
-
-    const startCamera = async () => {
-        try {
-            setCameraError('');
-            const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: { 
-                    facingMode: { ideal: 'environment' } 
-                }
-            });
-            setStream(mediaStream);
-            setIsCameraOpen(true);
-        } catch (err: any) {
-            console.error("Camera Error:", err);
-            setCameraError('Gagal membuka kamera: ' + (err.message || 'Permission denied'));
-             alert("Gagal mengakses kamera. Pastikan izin kamera diberikan.");
-        }
-    };
-
-    const stopCamera = () => {
-        const s = stream();
-        if (s) {
-            s.getTracks().forEach(track => track.stop());
-            setStream(null);
-        }
-        setIsCameraOpen(false);
-    };
-
-    const capturePhoto = () => {
-        if (!videoRef || !stream()) return;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = videoRef.videoWidth;
-        canvas.height = videoRef.videoHeight;
-        const ctx = canvas.getContext('2d');
-        
-        if (ctx) {
-            ctx.drawImage(videoRef, 0, 0);
-            canvas.toBlob((blob) => {
-                if (blob) {
-                    const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
-                    props.onChange(file);
-                    stopCamera();
-                }
-            }, 'image/jpeg', 0.8);
-        }
-    };
 
     return (
         <div class={props.class}>
@@ -80,7 +28,7 @@ export function PhotoCapture(props: PhotoCaptureProps) {
             </Show>
 
             <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md relative transition-colors bg-white dark:bg-gray-800 hover:border-blue-500 cursor-pointer"
-                 onClick={() => !props.value && !isCameraOpen() ? startCamera() : null}
+                 onClick={() => fileInputRef?.click()}
             >
                 <div class="space-y-1 text-center w-full">
                     <Show when={props.value || props.previewUrl} fallback={
@@ -109,6 +57,7 @@ export function PhotoCapture(props: PhotoCaptureProps) {
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     props.onChange(null);
+                                    if (fileInputRef) fileInputRef.value = '';
                                 }}
                             >
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -125,69 +74,17 @@ export function PhotoCapture(props: PhotoCaptureProps) {
                 type="file"
                 class="hidden"
                 accept="image/*"
+                // @ts-ignore
+                capture="environment"
                 onChange={(e) => {
                     if (e.currentTarget.files && e.currentTarget.files[0]) {
                         props.onChange(e.currentTarget.files[0]);
                     }
                 }}
             />
-
-            <Show when={cameraError()}>
-                <p class="mt-2 text-sm text-red-600">{cameraError()}</p>
-            </Show>
             
              <Show when={props.helperText}>
                 <p class="mt-2 text-sm text-gray-500">{props.helperText}</p>
-            </Show>
-
-            <Show when={isCameraOpen()}>
-                <div class="fixed inset-0 z-[100] bg-black flex flex-col">
-                    <div class="flex justify-between items-center p-4 bg-black/50 absolute top-0 w-full z-10">
-                        <span class="text-white font-bold">Ambil Foto</span>
-                         <button 
-                            type="button"
-                            onClick={stopCamera} 
-                            class="text-white p-2"
-                        >
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-
-                    {/* Viewport */}
-                    <div class="flex-1 flex items-center justify-center overflow-hidden my-4 relative rounded-xl border border-gray-700">
-                        <video 
-                            ref={(el) => {
-                                videoRef = el;
-                                el.srcObject = stream()!;
-                                // iOS requires explicit play call sometimes
-                                el.play().catch(e => console.log("Play error:", e));
-                            }}
-                            class="absolute w-full h-full object-cover"
-                            autoplay
-                            playsinline
-                            // @ts-ignore
-                            webkit-playsinline="true"
-                            muted
-                            onLoadedMetadata={(e) => {
-                                // Double assurance for iOS
-                                e.currentTarget.play().catch(e => console.log("Metadata play error:", e));
-                            }}
-                        />
-                    </div>
-
-                    {/* Controls */}
-                    <div class="flex justify-center pb-8">
-                        <button 
-                            type="button"
-                            onClick={capturePhoto} 
-                            class="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center bg-transparent active:bg-white/20 transition-colors"
-                        >
-                            <div class="w-16 h-16 bg-white rounded-full"></div>
-                        </button>
-                    </div>
-                </div>
             </Show>
         </div>
     );
