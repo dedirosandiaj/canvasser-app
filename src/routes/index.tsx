@@ -1,4 +1,4 @@
-import { createSignal, Show, onMount, createEffect } from 'solid-js';
+import { createSignal, Show, onMount, createEffect, onCleanup } from 'solid-js';
 import imageCompression from 'browser-image-compression';
 import { submitVisit, type VisitData } from '~/lib/server/sheets';
 import { uploadToGoogleDrive } from '~/lib/server/gdrive';
@@ -23,6 +23,66 @@ export default function CanvasserForm() {
         showCloseButton: false
     });
 
+    // --- Access Code Logic ---
+    const [isAuthenticated, setIsAuthenticated] = createSignal(false);
+
+    const checkAccess = () => {
+        const isVerified = localStorage.getItem('isVerified');
+        if (isVerified === 'true') {
+            setIsAuthenticated(true);
+            return;
+        }
+
+        Swal.fire({
+            title: 'Kode Akses',
+            input: 'password',
+            inputPlaceholder: 'Masukkan kode...',
+            width: '300px',
+            customClass: {
+                popup: 'rounded-none shadow-lg',
+                title: 'text-lg font-bold text-gray-800',
+                input: 'text-sm border-gray-300 rounded-none focus:ring-primary focus:border-primary px-3 py-2',
+                confirmButton: 'text-sm px-6 py-2 rounded-none font-medium bg-rose-600 text-white hover:bg-rose-700 w-full mt-2',
+                validationMessage: 'text-xs text-rose-600 mt-2'
+            },
+            buttonsStyling: false,
+            inputAttributes: {
+                autocapitalize: 'off',
+                autocorrect: 'off'
+            },
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            confirmButtonText: 'Masuk',
+            showLoaderOnConfirm: true,
+            preConfirm: (login) => {
+                if (login !== 'Nus4c1t4#') { 
+                    Swal.showValidationMessage('Kode akses salah!');
+                }
+                return login === 'Nus4c1t4#';
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                localStorage.setItem('isVerified', 'true');
+                setIsAuthenticated(true);
+                const Toast = Swal.mixin({
+                    toast: true,
+                    position: "top-end",
+                    showConfirmButton: false,
+                    timer: 3000,
+                    timerProgressBar: true,
+                    didOpen: (toast) => {
+                      toast.onmouseenter = Swal.stopTimer;
+                      toast.onmouseleave = Swal.resumeTimer;
+                    }
+                  });
+                  Toast.fire({
+                    icon: "success",
+                    title: "Akses Diterima"
+                  });
+            }
+        });
+    };
+
     const [manualMode, setManualMode] = createSignal(false);
 
     // Form state
@@ -40,6 +100,7 @@ export default function CanvasserForm() {
     });
 
     onMount(() => {
+        checkAccess(); 
         const savedData = localStorage.getItem('canvasser_form_data');
         if (savedData) {
             try {
@@ -55,7 +116,7 @@ export default function CanvasserForm() {
         // Auto-trigger location slightly delayed
         setTimeout(() => {
             console.log("Auto-triggering location...");
-            getLocation();
+            startWatchingLocation();
         }, 1000);
     });
 
@@ -195,71 +256,108 @@ export default function CanvasserForm() {
         }
     };
 
-    const simulateLocation = () => {
-        setDebugStatus('Using Simulated Location (Jakarta)...');
-        // Monas, Jakarta coordinates
-        const lat = -6.175392;
-        const lng = 106.827153;
-        setCoords({ lat, lng });
-        reverseGeocode(lat, lng);
+    // --- Realtime GPS Logic ---
+    let watchId: number | null = null;
+    let lastGeocodedCoords: { lat: number; lng: number } | null = null;
+    
+    // Haversine Formula to calculate distance in meters
+    const getDistanceFromLatLonInMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+        const R = 6371; // Radius of the earth in km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const d = R * c; // Distance in km
+        return d * 1000; // Distance in meters
     };
 
-    // Simplified Geolocation (Standard Browser)
-    const getLocation = () => {
-        console.log('Using standard browser geolocation...');
-        setError(''); 
-        setDebugStatus('Requesting browser location (Standard)...');
+    const startWatchingLocation = () => {
+        console.log('Starting Realtime GPS Tracking...');
+        setError('');
+        setDebugStatus('Menunggu sinyal GPS Realtime...');
         setLocationLoading(true);
 
-        // Check if blocked by security
         if (!navigator.geolocation) {
-            console.warn('Geolocation API not found/blocked. Trying IP Fallback.');
-            getIpLocation();
-            return;
+             console.warn('Geolocation API not found/blocked. Trying IP Fallback.');
+             getIpLocation();
+             return;
         }
 
-        // Simple standard call
-        navigator.geolocation.getCurrentPosition(
+        watchId = navigator.geolocation.watchPosition(
             (position) => {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
-                
-                // Step 1: Coords Acquired
-                const coordMsg = `✅ 1. Koordinat OK (GPS): ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-                setDebugStatus(coordMsg + '\n⏳ 2. Mengambil Data Alamat Saat ini...');
-                
+                // const accuracy = position.coords.accuracy;
+
+                // 1. Always update coordinates immediately
                 setCoords({ lat, lng });
                 
-                // Step 2: Fetch Address (Separated)
-                console.log('Coords found. Triggering Reverse Geocode...');
-                reverseGeocode(lat, lng);
-                setLocationLoading(false);
+                // 2. Check if we need to update address (Throttle: > 30 meters)
+                let shouldGeocode = false;
+                if (!lastGeocodedCoords) {
+                    shouldGeocode = true;
+                } else {
+                    const dist = getDistanceFromLatLonInMeters(
+                        lastGeocodedCoords.lat, 
+                        lastGeocodedCoords.lng, 
+                        lat, 
+                        lng
+                    );
+                    if (dist > 30) {
+                        shouldGeocode = true;
+                        // console.log(`Moved ${dist.toFixed(0)}m. Updating address...`);
+                    }
+                }
+
+                if (shouldGeocode) {
+                    setDebugStatus(`✅ GPS Realtime Active\nLat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}\n(Memperbarui Alamat...)`);
+                    lastGeocodedCoords = { lat, lng };
+                    reverseGeocode(lat, lng); 
+                    setLocationLoading(false); 
+                } else {
+                    // Just update status without fetching address
+                     setDebugStatus(`✅ GPS Realtime Active\nLat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`);
+                }
             },
             (err) => {
-                console.warn("Geo Error:", err);
-                const msg = `GPS Error: ${err.message}. Switch to IP Fallback...`;
-                setDebugStatus(msg);
-                
-                // Automatically switch to IP Fallback
-                getIpLocation();
+                console.warn("Watch Position Error:", err);
+                if (!coords()) { // Only fallback if we haven't got ANY coords yet
+                    const msg = `GPS Error: ${err.message}. Switch to IP Fallback...`;
+                    setDebugStatus(msg);
+                    getIpLocation();
+                }
             },
             {
                 enableHighAccuracy: true,
-                timeout: 5000, // Timeout reduced to 5s to trigger fallback faster
+                timeout: 10000, 
                 maximumAge: 0
             }
         );
     };
 
-
-
+    // Auto-get location on mount logic
+    // onMount(() => {
+    //     // We delay slightly to ensure UI is ready, but still trigger it.
+    //     setTimeout(() => {
+    //         console.log("Auto-triggering location...");
+    //         startWatchingLocation();
+    //     }, 1000);
+    // });
     // Auto-get location on mount
     onMount(() => {
-        // We delay slightly to ensure UI is ready, but still trigger it.
         setTimeout(() => {
-            console.log("Auto-triggering location...");
-            getLocation();
-        }, 1000);
+             startWatchingLocation(); // Start
+        }, 500);
+
+        onCleanup(() => {
+            if (watchId !== null) {
+                console.log("Stopping GPS Watcher...");
+                navigator.geolocation.clearWatch(watchId);
+            }
+        });
     });
 
     const handlePhotoChange = (e: Event & { currentTarget: HTMLInputElement }) => {
@@ -394,6 +492,7 @@ export default function CanvasserForm() {
 
     return (
         <div class="min-h-screen bg-gray-50 p-4">
+          <Show when={isAuthenticated()}>
             <div class="max-w-md mx-auto space-y-6">
                 <div class="flex justify-center">
                     <img src="/logo-nusacita.png" alt="Logo" class="h-20 w-20 object-contain drop-shadow-md" />
@@ -498,6 +597,7 @@ export default function CanvasserForm() {
                                 coords={coords()}
                                 kota={formData().kota}
                                 kecamatan={formData().kecamatan}
+                                provinsi={formData().provinsi}
                             />
 
                             {/* Keterangan */}
@@ -531,11 +631,11 @@ export default function CanvasserForm() {
                                             type="button" 
                                             variant="text" 
                                             size="sm" 
-                                            onClick={() => getLocation()}
+                                            onClick={() => startWatchingLocation()}
                                             disabled={locationLoading()}
                                             class="text-xs"
                                         >
-                                            {locationLoading() ? "Mencari..." : "Refresh Lokasi"}
+                                            {locationLoading() ? "" : "Refresh Lokasi"}
                                         </Button>
                                     </Show>
                                 </div>
@@ -584,9 +684,9 @@ export default function CanvasserForm() {
                                         
                                         <div class="flex-1 truncate">
                                             {coords() 
-                                                ? `GPS Terkunci: ${coords()?.lat.toFixed(5)}, ${coords()?.lng.toFixed(5)}`
+                                                ? `${coords()?.lat.toFixed(5)}, ${coords()?.lng.toFixed(5)}`
                                                 : locationLoading() 
-                                                    ? "Sedang mendeteksi lokasi..." 
+                                                    ? "" 
                                                     : "Gagal mendeteksi lokasi."
                                             }
                                         </div>
@@ -601,6 +701,7 @@ export default function CanvasserForm() {
                     </Card>
                 </form>
             </div>
+          </Show>
         </div>
     );
 }

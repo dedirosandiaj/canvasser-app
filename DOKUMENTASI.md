@@ -1,100 +1,126 @@
-# Dokumentasi Aplikasi Canvasser
+# 📘 Dokumentasi Lengkap Aplikasi Canvasser
 
-**Canvasser App** adalah bagian dari **Helpdesk Monitoring System**, sebuah aplikasi web modern yang dibangun untuk memudahkan tim sales/canvaser dalam mencatat aktivitas kunjungan mereka secara real-time dan akurat.
-
-## 🚀 Teknologi yang Digunakan
-
-Aplikasi ini dibangun menggunakan teknologi web modern untuk performa tinggi dan pengalaman pengguna yang responsif:
-
--   **Frontend Framework**: [SolidJS](https://www.solidjs.com/) dengan [SolidStart](https://start.solidjs.com/) (SSR/Client-side).
--   **Styling**: [TailwindCSS](https://tailwindcss.com/) untuk desain antarmuka yang cepat dan konsisten.
--   **Database/Storage**: Google Sheets (sebagai backend sederhana) & Google Drive (untuk penyimpanan foto).
--   **Maps & Location**: OpenStreetMap (Nominatim) & BigDataCloud untuk reverse geocoding (konversi koordinat ke alamat).
--   **Build Tool**: Vite.
+**Canvasser App** adalah solusi digital modern bagian dari ekosistem **Helpdesk Monitoring System**. Aplikasi ini dirancang khusus untuk memfasilitasi tim sales dan canvaser dalam melakukan pelaporan kunjungan lapangan secara *real-time*, akurat, dan terverifikasi.
 
 ---
 
-## ✨ Fitur Utama
+## 🚀 Stack Teknologi
 
-### 1. Pencatatan Kunjungan (Visit Tracking)
-Formulir input data yang intuitif untuk mencatat detail kunjungan:
--   Nama Sales
--   Informasi Toko (Nama, PIC, No. Telp)
--   Status Kunjungan (Sewa, Trial, Beli, dll)
--   Keterangan Tambahan
+Aplikasi ini dibangun di atas pondasi teknologi web terkini untuk menjamin kecepatan, keamanan, dan kemudahan pengembangan:
 
-### 2. Geolokasi Cerdas & Alamat Otomatis
--   **Deteksi Otomatis**: Aplikasi secara otomatis mengambil koordinat GPS (Latitude & Longitude) pengguna saat formulir dibuka.
--   **Reverse Geocoding**: Koordinat tersebut otomatis dikonversi menjadi alamat lengkap yang meliputi **Kecamatan**, **Kota**, dan **Provinsi**.
--   **Fallback System**: Jika GPS gagal, sistem memiliki mekanisme cadangan (fallback) untuk tetap mendapatkan perkiraan lokasi.
-
-### 3. Foto Bukti Kunjungan dengan Watermark
-Fitur kamera terintegrasi yang canggih:
--   **Watermark Otomatis**: Setiap foto yang diambil atau diunggah akan otomatis ditempelkan informasi penting:
-    -   **Logo Perusahaan** (Nusacita).
-    -   **Timestamp**: Tanggal dan jam pengambilan foto.
-    -   **Koordinat**: Latitude & Longitude.
-    -   **Alamat**: Kecamatan, Kota, Provinsi.
-    -   **Sumber Foto**: Indikator apakah foto diambil langsung dari **Kamera** (hijau) atau dari **Galeri** (kuning).
--   **Optimasi Gambar**: Kompresi otomatis di sisi klien (browser) sebelum diunggah untuk menghemat kuota dan mempercepat proses.
-
-### 4. Integrasi Google Sheets
-Data yang dikirimkan langsung tersimpan rapi di Google Sheets, memudahkan tim admin untuk melakukan rekapitulasi dan analisis data tanpa perlu dashboard backend yang rumit. Kolom data mencakup:
--   Timestamp, Sales, Toko, PIC, Telp.
--   Kec, Kota, Provinsi.
--   Status, Link Foto (Google Drive), Link Maps, Keterangan.
+| Komponen | Teknologi | Deskripsi |
+| :--- | :--- | :--- |
+| **Framework** | [SolidJS](https://www.solidjs.com/) | UI Library super cepat tanpa Virtual DOM. |
+| **Meta-Framework** | [SolidStart](https://start.solidjs.com/) | Menangani SSR (Server-Side Rendering) dan Routing. |
+| **Styling** | [TailwindCSS](https://tailwindcss.com/) | Framework CSS utility-first untuk desain responsif. |
+| **Database** | Google Sheets | Database serverless yang mudah diakses oleh manajemen. |
+| **File Storage** | Google Drive | Penyimpanan bukti foto kunjungan yang aman & terpusat. |
+| **Maps API** | OpenStreetMap & BigDataCloud | Layanan geolokasi dan konversi koordinat ke alamat. |
+| **UI Components** | SweetAlert2 | Notifikasi dan popup interaktif yang modern. |
 
 ---
 
-## 📂 Struktur Proyek
+## ✨ Fitur & Fungsionalitas Detail
 
-Berikut adalah struktur folder dan file penting dalam aplikasi `apps/canvasser-app`:
+### 🔐 1. Keamanan & Kode Akses
+Untuk mencegah akses yang tidak sah, aplikasi dilindungi oleh sistem otentikasi sederhana namun efektif:
+-   **Kode Akses**: Pengguna wajib memasukkan kode rahasia (`Nus4c1t4#`) saat pertama kali membuka aplikasi.
+-   **Persistensi Sesi**: Status login disimpan di *Local Storage* browser, sehingga user tidak perlu memasukkan kode berulang kali selama cache tidak dibersihkan.
+-   **Antarmuka Mobile-Friendly**: Popup login didesain responsif dengan tombol besar dan input yang mudah diakses di layar ponsel.
 
-```
+### 📍 2. Pelacakan Lokasi Real-time (Live GPS)
+Aplikasi tidak hanya mengambil satu titik lokasi, melainkan memantau pergerakan user secara aktif:
+-   **Live Tracking**: Menggunakan API `navigator.geolocation.watchPosition` untuk memantau perubahan koordinat (Latitude/Longitude) secara instan.
+-   **Smart Throttling**: Untuk menghemat baterai dan kuota data, alamat lengkap (Jalan, Kecamatan, Kota) hanya akan diperbarui otomatis jika pengguna berpindah tempat lebih dari **30 meter**.
+-   **Akurasi Tinggi**: Memprioritaskan sinyal GPS `High Accuracy`. Jika gagal, sistem akan otomatis beralih ke estimasi lokasi berbasis IP Address (BigDataCloud).
+
+### 📸 3. Kamera Cerdas & Watermark Otomatis
+Setiap bukti kunjungan diverifikasi melalui sistem *watermarking* digital yang diproses langsung di perangkat pengguna (*Client-side Processing*):
+
+**Elemen Watermark:**
+1.  **Logo Perusahaan**: Logo dipasang di pojok kanan bawah dengan opasitas 20% agar tidak menutupi objek foto.
+2.  **Timestamp**: Tanggal dan Waktu pengambilan foto yang tidak bisa dimanipulasi (mengambil waktu server/perangkat saat itu).
+3.  **Koordinat GPS**: Latitude dan Longitude tempat foto diambil.
+4.  **Alamat Lengkap**: Kecamatan, Kota, dan Provinsi yang diambil dari data geolokasi.
+5.  **Indikator Sumber Foto**:
+    -   🟢 **Source: Kamera**: Jika foto baru diambil (deteksi berdasarkan waktu modifikasi file < 3 menit).
+    -   🟡 **Source: Galeri**: Jika foto diambil dari penyimpanan lama.
+
+### 📊 4. Integrasi Laporan Otomatis
+Data yang dikirimkan oleh canvaser akan langsung masuk ke Google Sheets Pusat dengan format yang rapi:
+-   **Waktu**: Timestamp server.
+-   **Identitas**: Nama Sales, Nama Toko, Nama PIC, No. Telp.
+-   **Lokasi**: Kecamatan, Kota, Provinsi.
+-   **Status & Bukti**: Status Kunjungan, Link Foto (Google Drive), Link Google Maps.
+-   **Catatan**: Keterangan tambahan dari sales.
+
+---
+
+## 📂 Struktur Direktori Proyek
+
+Memahami struktur folder akan memudahkan proses *maintenance* dan pengembangan fitur baru:
+
+```bash
 /src
-├── /components
+├── /components         # Komponen UI yang dapat digunakan kembali
 │   └── /ui
-│       └── PhotoCapture.tsx    # Komponen kamera & logika watermark canvas
-├── /lib
+│       ├── PhotoCapture.tsx    # 📸 Logika Kamera & Canvas Watermark
+│       ├── TextField.tsx       # Inputan Text
+│       ├── Select.tsx          # Dropdown Pilihan
+│       └── ...
+├── /lib               # Pustaka & Logika Bisnis
 │   └── /server
-│       ├── gdrive.ts           # Logika upload ke Google Drive
-│       └── sheets.ts           # Logika koneksi ke Google Sheets
-├── /routes
-│   └── index.tsx               # Halaman utama formulir & logika geolokasi
-├── app.tsx                     # Entry point aplikasi
-└── entry-server.tsx            # Konfigurasi server-side rendering
+│       ├── gdrive.ts           # ☁️ Upload file ke Google Drive
+│       └── sheets.ts           # 📊 Read/Write ke Google Sheets
+├── /routes             # Halaman Aplikasi (File-based Routing)
+│   └── index.tsx               # 🏠 Halaman Utama (Form, GPS Logic, Auth)
+├── app.tsx             # Entry point utama aplikasi
+├── app.config.ts       # Konfigurasi Vite & PWA
+└── ...
 ```
 
 ---
 
-## 🛠️ Cara Menjalankan (Development)
+## 🛠️ Panduan Instalasi & Pengembangan
 
-Pastikan sudah menginstall [Node.js](https://nodejs.org/).
+Ikuti langkah ini jika ingin menjalankan project di komputer lokal (Localhost):
 
-1.  **Install Dependencies**
+1.  **Persiapan Lingkungan**
+    Pastikan **Node.js** (versi 18+) sudah terinstall.
+
+2.  **Install Dependencies**
+    Download semua *library* yang dibutuhkan:
     ```bash
     npm install
     ```
 
-2.  **Konfigurasi Environment (.env)**
-    Pastikan file `.env` memiliki kredensial yang dibutuhkan:
+3.  **Konfigurasi Environment (.env)**
+    Buat file `.env` di root folder dan isi kredensial berikut:
     ```env
-    GOOGLE_SERVICE_ACCOUNT_EMAIL=...
-    GOOGLE_PRIVATE_KEY=...
-    GOOGLE_SHEET_ID=...
-    GOOGLE_DRIVE_FOLDER_ID=...
+    GOOGLE_SERVICE_ACCOUNT_EMAIL="email-service-account@project.iam.gserviceaccount.com"
+    GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n..."
+    GOOGLE_SHEET_ID="ID_SPREADSHEET_GOOGLE_SHEETS"
+    GOOGLE_DRIVE_FOLDER_ID="ID_FOLDER_GOOGLE_DRIVE"
     ```
 
-3.  **Jalankan Server Development**
+4.  **Menjalankan Server Dev**
     ```bash
     npm run dev
     ```
-    Aplikasi akan berjalan di `http://localhost:3000`.
+    Akses aplikasi di browser melalui: `http://localhost:3000`
 
 ---
 
-## 📝 Catatan Penting
+## ⚠️ Troubleshooting Umum
 
--   **Izin Lokasi**: Pastikan browser mengizinkan akses lokasi untuk fitur geolokasi yang akurat.
--   **Kamera**: Pada perangkat mobile, tombol "Ambil Foto" akan memprioritaskan kamera belakang.
--   **Watermark**: Proses watermark dilakukan di browser pengguna (Client-side), sehingga tidak membebani server.
+-   **Lokasi tidak muncul / Gagal**:
+    -   Pastikan GPS di HP aktif.
+    -   Izinkan akses lokasi pada browser (Chrome/Safari).
+    -   Coba refresh halaman. Jika GPS hardware bermasalah, aplikasi akan mencoba menggunakan lokasi IP (kurang akurat tapi cukup untuk estimasi kota).
+    
+-   **Foto Gagal Terupload**:
+    -   Pastikan koneksi internet stabil.
+    -   Cek kuota penyimpanan Google Drive pada akun Service Account.
+
+-   **Kode Akses Lupa**:
+    -   Kode default hardcoded: `Nus4c1t4#` (Case sensitive).
