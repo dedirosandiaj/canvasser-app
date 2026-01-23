@@ -482,6 +482,8 @@ export default function CanvasserForm() {
                                 required
                                 cameraOnly
                                 coords={coords()}
+                                kota={formData().kota}
+                                kecamatan={formData().kecamatan}
                             />
 
                             {/* Keterangan */}

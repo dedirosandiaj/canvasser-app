@@ -15,6 +15,8 @@ interface PhotoCaptureProps {
     class?: string;
     cameraOnly?: boolean;
     coords?: { lat: number; lng: number } | null;
+    kota?: string;
+    kecamatan?: string;
 }
 
 export function PhotoCapture(props: PhotoCaptureProps) {
@@ -40,53 +42,72 @@ export function PhotoCapture(props: PhotoCaptureProps) {
                 ctx.drawImage(img, 0, 0);
 
                 // 2. Draw Bottom Overlay (Gradient/Semi-transparent black)
-                const gradientHeight = img.height * 0.3; // Bottom 30%
+                // Increase gradient height to accommodate more text
+                const gradientHeight = img.height * 0.4; 
                 const gradient = ctx.createLinearGradient(0, img.height - gradientHeight, 0, img.height);
                 gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-                gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.5)');
-                gradient.addColorStop(1, 'rgba(0, 0, 0, 0.8)');
+                gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.6)');
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
                 
                 ctx.fillStyle = gradient;
                 ctx.fillRect(0, img.height - gradientHeight, img.width, gradientHeight);
 
                 // 3. Watermark Info
-                const fontSize = Math.max(16, img.width * 0.03); // Responsive font size
+                const fontSize = Math.max(16, img.width * 0.025); // Slightly smaller font to fit more
                 ctx.font = `bold ${fontSize}px sans-serif`;
                 ctx.fillStyle = 'white';
                 ctx.textBaseline = 'bottom';
 
-                const margin = img.width * 0.05;
+                const margin = img.width * 0.04;
                 let currentY = img.height - margin;
+                const lineHeight = fontSize * 1.4;
 
-                // Timestamp
+                // Detect Source (Camera vs Gallery)
+                // Heuristic: If file was modified within last 3 minutes, assume Camera/New. Else Gallery.
+                const isRecent = (Date.now() - file.lastModified) < 3 * 60 * 1000;
+                const sourceText = isRecent ? "Source: Kamera" : "Source: Galeri";
+                
+                // Draw Order (Bottom to Top)
+                
+                // Line 1: Timestamp
                 const now = new Date();
                 const dateStr = now.toLocaleDateString('id-ID', { 
                     day: '2-digit', month: '2-digit', year: 'numeric',
                     hour: '2-digit', minute: '2-digit', second: '2-digit'
-                }).replace(/\./g, ':'); // Fix separator if needed
-                
+                }).replace(/\./g, ':');
                 ctx.fillText(dateStr, margin, currentY);
-                currentY -= (fontSize * 1.5);
+                currentY -= lineHeight;
 
-                // Coordinates
+                // Line 2: Coordinates
                 if (props.coords) {
                     const coordStr = `Lat: ${props.coords.lat.toFixed(6)}, Long: ${props.coords.lng.toFixed(6)}`;
                     ctx.fillText(coordStr, margin, currentY);
-                    currentY -= (fontSize * 1.5); // Move text up
+                    currentY -= lineHeight;
                 }
 
+                // Line 3: Address (Kec, Kota)
+                if (props.kecamatan || props.kota) {
+                    const addrStr = `${props.kecamatan || '-'}, ${props.kota || '-'}`;
+                    ctx.fillText(addrStr, margin, currentY);
+                    currentY -= lineHeight;
+                }
+
+                // Line 4: Source
+                ctx.fillStyle = isRecent ? '#a7f3d0' : '#fde68a'; // Greenish for Camera, Yellowish for Gallery
+                ctx.fillText(sourceText, margin, currentY);
+                ctx.fillStyle = 'white'; // Reset
+                
                 // 4. Logo (Bottom Right)
                 const logo = new Image();
                 logo.crossOrigin = "anonymous";
                 logo.src = '/logo-nusacita.png';
                 
                 logo.onload = () => {
-                    const logoWidth = img.width * 0.2; // 20% of image width
-                    const logoHeight = logoWidth * (logo.height / logo.width); // Maintain aspect ratio
+                    const logoWidth = img.width * 0.18; // 18% of image width
+                    const logoHeight = logoWidth * (logo.height / logo.width); 
                     const logoX = img.width - margin - logoWidth;
                     const logoY = img.height - margin - logoHeight;
 
-                    // Draw logo
                     ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
 
                     // Finalize
@@ -100,14 +121,13 @@ export function PhotoCapture(props: PhotoCaptureProps) {
                         } else {
                             reject(new Error('Canvas to Blob failed'));
                         }
-                    }, 'image/jpeg', 0.85); // 85% Quality
+                    }, 'image/jpeg', 0.85); 
                 };
 
                 logo.onerror = () => {
-                    // If logo fails, resolve anyway without logo
                     console.warn("Watermark logo failed to load");
                     canvas.toBlob((blob) => {
-                        if (blob) {
+                         if (blob) {
                             resolve(new File([blob], file.name, { type: file.type }));
                         } else {
                             reject(new Error('Canvas to Blob failed (no logo)'));
@@ -130,11 +150,9 @@ export function PhotoCapture(props: PhotoCaptureProps) {
                 props.onChange(watermarkedFile);
             } catch (error) {
                 console.error("Watermark failed:", error);
-                // Fallback to original
                 props.onChange(file);
             } finally {
                 setProcessing(false);
-                // Reset input to allow selecting same file again
                 if (fileInputRef) fileInputRef.value = ''; 
             }
         }
