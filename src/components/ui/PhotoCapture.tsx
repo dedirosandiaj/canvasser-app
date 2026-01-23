@@ -3,7 +3,7 @@
  * File input with camera capture option for mobile devices
  */
 
-import { Show } from 'solid-js';
+import { Show, createSignal } from 'solid-js';
 
 interface PhotoCaptureProps {
     label: string;
@@ -14,23 +14,155 @@ interface PhotoCaptureProps {
     helperText?: string;
     class?: string;
     cameraOnly?: boolean;
+    coords?: { lat: number; lng: number } | null;
 }
 
 export function PhotoCapture(props: PhotoCaptureProps) {
     let fileInputRef: HTMLInputElement | undefined;
+    const [processing, setProcessing] = createSignal(false);
+
+    const processImage = async (file: File): Promise<File> => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    reject(new Error('Canvas context not available'));
+                    return;
+                }
+
+                // Set canvas dimensions to match image
+                canvas.width = img.width;
+                canvas.height = img.height;
+
+                // 1. Draw Original Image
+                ctx.drawImage(img, 0, 0);
+
+                // 2. Draw Bottom Overlay (Gradient/Semi-transparent black)
+                const gradientHeight = img.height * 0.3; // Bottom 30%
+                const gradient = ctx.createLinearGradient(0, img.height - gradientHeight, 0, img.height);
+                gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+                gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.5)');
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 0.8)');
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, img.height - gradientHeight, img.width, gradientHeight);
+
+                // 3. Watermark Info
+                const fontSize = Math.max(16, img.width * 0.03); // Responsive font size
+                ctx.font = `bold ${fontSize}px sans-serif`;
+                ctx.fillStyle = 'white';
+                ctx.textBaseline = 'bottom';
+
+                const margin = img.width * 0.05;
+                let currentY = img.height - margin;
+
+                // Timestamp
+                const now = new Date();
+                const dateStr = now.toLocaleDateString('id-ID', { 
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                }).replace(/\./g, ':'); // Fix separator if needed
+                
+                ctx.fillText(dateStr, margin, currentY);
+                currentY -= (fontSize * 1.5);
+
+                // Coordinates
+                if (props.coords) {
+                    const coordStr = `Lat: ${props.coords.lat.toFixed(6)}, Long: ${props.coords.lng.toFixed(6)}`;
+                    ctx.fillText(coordStr, margin, currentY);
+                    currentY -= (fontSize * 1.5); // Move text up
+                }
+
+                // 4. Logo (Bottom Right)
+                const logo = new Image();
+                logo.crossOrigin = "anonymous";
+                logo.src = '/logo-nusacita.png';
+                
+                logo.onload = () => {
+                    const logoWidth = img.width * 0.2; // 20% of image width
+                    const logoHeight = logoWidth * (logo.height / logo.width); // Maintain aspect ratio
+                    const logoX = img.width - margin - logoWidth;
+                    const logoY = img.height - margin - logoHeight;
+
+                    // Draw logo
+                    ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
+
+                    // Finalize
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + "_watermarked.jpg", {
+                                type: 'image/jpeg',
+                                lastModified: Date.now(),
+                            });
+                            resolve(newFile);
+                        } else {
+                            reject(new Error('Canvas to Blob failed'));
+                        }
+                    }, 'image/jpeg', 0.85); // 85% Quality
+                };
+
+                logo.onerror = () => {
+                    // If logo fails, resolve anyway without logo
+                    console.warn("Watermark logo failed to load");
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            resolve(new File([blob], file.name, { type: file.type }));
+                        } else {
+                            reject(new Error('Canvas to Blob failed (no logo)'));
+                        }
+                    }, 'image/jpeg', 0.85);
+                };
+            };
+            
+            img.onerror = (err) => reject(err);
+            img.src = URL.createObjectURL(file);
+        });
+    };
+
+    const handleFileChange = async (e: Event & { currentTarget: HTMLInputElement }) => {
+        const file = e.currentTarget.files?.[0];
+        if (file) {
+            setProcessing(true);
+            try {
+                const watermarkedFile = await processImage(file);
+                props.onChange(watermarkedFile);
+            } catch (error) {
+                console.error("Watermark failed:", error);
+                // Fallback to original
+                props.onChange(file);
+            } finally {
+                setProcessing(false);
+                // Reset input to allow selecting same file again
+                if (fileInputRef) fileInputRef.value = ''; 
+            }
+        }
+    };
 
     return (
         <div class={props.class}>
             <Show when={props.label}>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label class="block text-sm font-medium text-black-700 dark:text-black-300 mb-2">
                     {props.label} {props.required && <span class="text-red-500">*</span>}
                 </label>
             </Show>
 
-            <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md relative transition-colors bg-white dark:bg-gray-800 hover:border-blue-500 cursor-pointer"
-                 onClick={() => fileInputRef?.click()}
+            <div class={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md relative transition-colors 
+                ${processing() ? 'bg-gray-100 cursor-wait border-white-400' : 'bg-white dark:bg-white-800 hover:border-blue-500 cursor-pointer border-gray-300 dark:border-gray-600'}`}
+                 onClick={() => !processing() && fileInputRef?.click()}
             >
                 <div class="space-y-1 text-center w-full">
+                    <Show when={processing()}>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-10 backdrop-blur-sm">
+                             <svg class="animate-spin h-8 w-8 text-blue-600 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span class="text-sm font-medium text-blue-600">Processing Watermark...</span>
+                        </div>
+                    </Show>
+
                     <Show when={props.value || props.previewUrl} fallback={
                         <div class="flex flex-col items-center">
                             <div class="mx-auto h-12 w-12 text-gray-400">
@@ -39,7 +171,7 @@ export function PhotoCapture(props: PhotoCaptureProps) {
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
                             </div>
-                            <div class="flex text-sm text-gray-600 dark:text-gray-400 justify-center mt-2">
+                            <div class="flex text-sm text-gray-600 dark:text-white-400 justify-center mt-2">
                                 <span class="relative rounded-md font-medium text-blue-600 hover:text-blue-500">
                                     Ambil Foto
                                 </span>
@@ -76,11 +208,7 @@ export function PhotoCapture(props: PhotoCaptureProps) {
                 accept="image/*"
                 // @ts-ignore
                 capture="environment"
-                onChange={(e) => {
-                    if (e.currentTarget.files && e.currentTarget.files[0]) {
-                        props.onChange(e.currentTarget.files[0]);
-                    }
-                }}
+                onChange={handleFileChange}
             />
             
              <Show when={props.helperText}>

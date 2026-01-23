@@ -481,6 +481,7 @@ export default function CanvasserForm() {
                                 previewUrl={previewUrl()}
                                 required
                                 cameraOnly
+                                coords={coords()}
                             />
 
                             {/* Keterangan */}
