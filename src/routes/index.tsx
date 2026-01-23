@@ -64,21 +64,17 @@ export default function CanvasserForm() {
             if (result.isConfirmed) {
                 localStorage.setItem('isVerified', 'true');
                 setIsAuthenticated(true);
-                const Toast = Swal.mixin({
-                    toast: true,
-                    position: "top-end",
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Akses Diterima',
                     showConfirmButton: false,
-                    timer: 3000,
-                    timerProgressBar: true,
-                    didOpen: (toast) => {
-                      toast.onmouseenter = Swal.stopTimer;
-                      toast.onmouseleave = Swal.resumeTimer;
+                    timer: 1500,
+                    width: '300px',
+                    customClass: {
+                        popup: 'rounded-none shadow-lg',
+                        title: 'text-lg font-bold text-gray-800'
                     }
-                  });
-                  Toast.fire({
-                    icon: "success",
-                    title: "Akses Diterima"
-                  });
+                });
             }
         });
     };
