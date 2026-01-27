@@ -108,7 +108,7 @@ export default function CanvasserForm() {
                 console.error('Failed to parse saved form data', e);
             }
         }
-        
+
         // Auto-trigger location slightly delayed
         setTimeout(() => {
             console.log("Auto-triggering location...");
@@ -137,12 +137,12 @@ export default function CanvasserForm() {
     // Reverse geocoding using Free Providers (OSM & BigDataCloud)
     const reverseGeocode = async (lat: number, lng: number) => {
         setDebugStatus(`Got Coords (${lat.toFixed(5)}, ${lng.toFixed(5)}). Fetching address...`);
-        
+
         // 1. Try Nominatim (OpenStreetMap)
         try {
             setLocationLoading(true);
             setDebugStatus(`Trying Provider 1: OpenStreetMap...`);
-            
+
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced to 3s
 
@@ -152,7 +152,7 @@ export default function CanvasserForm() {
                     signal: controller.signal,
                     headers: {
                         'Accept-Language': 'id',
-                        'User-Agent': 'CanvasserApp/1.0' 
+                        'User-Agent': 'CanvasserApp/1.0'
                     }
                 }
             );
@@ -162,12 +162,60 @@ export default function CanvasserForm() {
                 const data = await response.json();
                 const address = data.address || {};
                 // User Feedback: county -> Kota, municipality -> Kecamatan
-                const kota = address.city || address.county || address.regency || address.town || '';
-                const kecamatan = address.municipality || address.suburb || address.subdistrict || address.village || address.neighbourhood || '';
+                // Ref: https://wiki.openstreetmap.org/wiki/Id:Indonesian_Tagging_Guidelines/Admin_Level
+                
+                // Helper to normalize strings for comparison
+                const normalize = (s: string) => s ? s.trim().toLowerCase() : '';
+
+                // 3. Determine Provinsi - User Preference: State
                 const provinsi = address.state || address.region || '';
+                const provinsiNorm = normalize(provinsi);
+
+                // 1. Determine Kota (City/Kabupaten) - User Preference: County
+                // Fallback priorities: county > city > regency > town
+                let kota = '';
+                const kotaCandidates = [address.county, address.city, address.regency, address.town];
+                
+                for (const candidate of kotaCandidates) {
+                    if (candidate && normalize(candidate) !== provinsiNorm) {
+                        kota = candidate;
+                        break;
+                    }
+                }
+                // Fallback: If all candidates match province (rare but possible), just take the first valid one.
+                if (!kota && kotaCandidates.some(c => c)) {
+                     kota = kotaCandidates.find(c => c) || '';
+                }
+
+                // 2. Determine Kecamatan (District) - User Preference: Municipality
+                // Priority: municipality > district > suburb > subdistrict > ...
+                // Deduplication: MUST NOT be same as Kota OR Provinsi
+                const kotaNorm = normalize(kota);
+                let kecamatan = '';
+                const kecCandidates = [
+                    address.municipality, // User requested priority
+                    address.district,
+                    address.suburb,
+                    address.subdistrict, 
+                    address.village,
+                    address.neighbourhood
+                ];
+
+                for (const candidate of kecCandidates) {
+                    const candNorm = normalize(candidate);
+                    if (candidate && candNorm !== kotaNorm && candNorm !== provinsiNorm) {
+                        kecamatan = candidate;
+                        break;
+                    }
+                }
 
                 if (kota || kecamatan || provinsi) {
-                    setFormData(prev => ({ ...prev, kota, kecamatan, provinsi }));
+                    setFormData(prev => ({ 
+                        ...prev, 
+                        kota: kota || prev.kota, 
+                        kecamatan: kecamatan || prev.kecamatan, 
+                        provinsi: provinsi || prev.provinsi
+                    }));
                     setDebugStatus(prev => prev + '\n✅ 2. Alamat: ' + (kota || 'Kota?') + ', ' + (kecamatan || 'Kec?') + ', ' + (provinsi || 'Prov?'));
                     return; // Success
                 }
@@ -181,7 +229,7 @@ export default function CanvasserForm() {
         try {
             // setDebugStatus(`Trying Provider 2: BigDataCloud...`); // Too spammy, keep it clean
             const response = await fetch(
-                `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=id`
+                `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`
             );
 
             if (response.ok) {
@@ -201,7 +249,7 @@ export default function CanvasserForm() {
             }
         } catch (e: any) {
             console.error('BigDataCloud Failed:', e);
-            setDebugStatus(prev => prev + `\n❌ Sistem Gagal ambil alamat. Mohon Isi manual.`);
+            setDebugStatus(prev => prev + `\n❌ Sistem Gagal ambil alamat. Silahkan Isi manual.`);
         } finally {
             setLocationLoading(false);
         }
@@ -211,7 +259,7 @@ export default function CanvasserForm() {
     const getIpLocation = async () => {
         // ... (existing logic)
         setDebugStatus(prev => prev + '\n⚠️ GPS Gagal. Mencoba estimasi via IP (Jaringan)...');
-        
+
         try {
             // BigDataCloud with NO lat/lng params returns IP location
             const response = await fetch(
@@ -232,7 +280,7 @@ export default function CanvasserForm() {
                     kota: kota || prev.kota,
                     provinsi: provinsi || prev.provinsi
                 }));
-                
+
                 setDebugStatus(prev => prev + `\n✅ Lokasi Ditemukan (Estimasi IP): ${kota}\nLat: ${lat}, Lng: ${lng}`);
                 alert(`GPS Browser Gagal/Diblokir.\n\nMenggunakan Lokasi Estimasi IP:\n${kota}\n(${lat}, ${lng})`);
             } else {
@@ -421,7 +469,7 @@ export default function CanvasserForm() {
         try {
             // 1. Compress & Upload Photo
             let fileToUpload = photoFile()!;
-            
+
             console.log('Original file size:', fileToUpload.size / 1024 / 1024, 'MB');
 
             const options = {
@@ -468,13 +516,13 @@ export default function CanvasserForm() {
                 showConfirmButton: false,
                 timer: 1500
             });
-            
+
             // Clear storage and reload
             localStorage.removeItem('canvasser_form_data');
             window.location.reload();
 
         } catch (err: any) {
-             smallSwal.fire({
+            smallSwal.fire({
                 icon: 'error',
                 title: 'Terjadi Kesalahan',
                 text: err.message || 'Gagal menyimpan data. Silakan coba lagi.',
@@ -518,7 +566,7 @@ export default function CanvasserForm() {
                                 fullWidth
                             />
                             <TextField
-                                label="Nama Agen"
+                                label="Nama PIC"
                                 value={formData().nama_pic}
                                 onInput={(e) => setFormData({ ...formData(), nama_pic: e.currentTarget.value })}
                                 required
@@ -625,15 +673,15 @@ export default function CanvasserForm() {
                             <div class="space-y-3">
                                 <div class="flex items-center justify-between">
                                     <label class="flex items-center gap-2 cursor-pointer select-none">
-                                        <input 
-                                            type="checkbox" 
+                                        <input
+                                            type="checkbox"
                                             checked={manualMode()}
                                             onChange={(e) => setManualMode(e.currentTarget.checked)}
                                             class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
                                         />
                                         <span class="text-sm font-medium text-gray-700">Input Manual</span>
                                     </label>
-                                    
+
                                     <Show when={!manualMode()}>
                                         <Button 
                                             type="button" 
@@ -668,11 +716,10 @@ export default function CanvasserForm() {
                                 </Show>
 
                                 <Show when={!manualMode()}>
-                                    <div class={`p-3 rounded-lg text-sm flex items-center gap-2 transition-colors ${
-                                        coords() ? "bg-success-50 text-success-700 border border-success-100" : 
-                                        locationLoading() ? "bg-primary-50 text-primary-700 border border-primary-100" : 
-                                        "bg-error-50 text-error-700 border border-error-100"
-                                    }`}>
+                                    <div class={`p-3 rounded-lg text-sm flex items-center gap-2 transition-colors ${coords() ? "bg-success-50 text-success-700 border border-success-100" :
+                                        locationLoading() ? "bg-primary-50 text-primary-700 border border-primary-100" :
+                                            "bg-error-50 text-error-700 border border-error-100"
+                                        }`}>
                                         <Show when={locationLoading()} fallback={
                                             <Show when={coords()} fallback={
                                                 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -689,7 +736,7 @@ export default function CanvasserForm() {
                                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                             </svg>
                                         </Show>
-                                        
+
                                         <div class="flex-1 truncate">
                                             {coords() 
                                                 ? `${coords()?.lat.toFixed(5)}, ${coords()?.lng.toFixed(5)}`

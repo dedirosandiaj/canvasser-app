@@ -98,12 +98,23 @@ export async function submitVisit(data: VisitData): Promise<{ success: boolean; 
             console.log(`Title "${sheetTitle}" not found, creating new sheet...`);
             sheet = await doc.addSheet({ title: sheetTitle });
             await sheet.loadCells('A1:K1');
-            const headers = ['Timestamp', 'Nama Sales', 'Nama Toko', 'Nama PIC', 'No Telp', 'Kec', 'Kota', 'Provinsi', 'Status', 'Link Foto', 'Lat/Long', 'Keterangan'];
+            const headers = ['Timestamp', 'Waktu Kunjungan', 'Nama Sales', 'Nama Toko', 'Nama PIC', 'No Telp', 'Kec', 'Kota', 'Provinsi', 'Status', 'Link Foto', 'Lat/Long', 'Keterangan'];
             await sheet.setHeaderRow(headers);
         }
 
+        // Helper for Excel-friendly timestamp: YYYY-MM-DD HH:mm:ss
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+
         const rowValues = [
-            new Date().toISOString(),
+            new Date().toISOString(), // Keep original Timestamp for system use
+            formattedDate, // 'Waktu Kunjungan'
             data.nama_sales,
             data.nama_toko,
             data.nama_pic,
