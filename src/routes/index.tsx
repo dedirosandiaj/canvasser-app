@@ -249,7 +249,7 @@ export default function CanvasserForm() {
             }
         } catch (e: any) {
             console.error('BigDataCloud Failed:', e);
-            setDebugStatus(prev => prev + `\n❌ Sistem Gagal ambil alamat. Silahkan Isi manual.`);
+            setDebugStatus(prev => prev + `\n❌ Sistem Gagall ambil alamat. Silahkan Isi manual.`);
         } finally {
             setLocationLoading(false);
         }
