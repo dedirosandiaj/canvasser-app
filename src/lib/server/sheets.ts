@@ -21,6 +21,11 @@ export interface SalesOption {
     label: string;
 }
 
+export interface StatusOption {
+    value: string;
+    label: string;
+}
+
 // Helpers
 async function getDoc() {
     const hasServiceAccount = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY && process.env.GOOGLE_SHEET_ID;
@@ -79,6 +84,40 @@ export async function getSalesList(): Promise<SalesOption[]> {
             return sampleData;
         }
 
+    } catch (error) {
+        console.error('❌ Error connecting to Google Sheets:', error);
+        return sampleData;
+    }
+}
+
+export async function getStatusList(): Promise<StatusOption[]> {
+    const sampleData: StatusOption[] = [
+        { value: 'Follow-Up', label: 'Follow-Up' },
+        { value: 'Tidak Tertarik', label: 'Tidak Tertarik' },
+        { value: 'Activated', label: 'Activated' }
+    ];
+
+    try {
+        const doc = await getDoc();
+        let sheet = doc.sheetsByTitle['Status Kunjungan'];
+
+        if (!sheet) {
+            console.warn('⚠️ Sheet "Status Kunjungan" not found. Returning sample data.');
+            return sampleData;
+        }
+
+        try {
+            const rows = await sheet.getRows();
+            const statusData = rows.map(row => {
+                const status = row.get('Status') || row.get('Name') || '';
+                return { value: status, label: status };
+            }).filter(opt => opt.value);
+
+            return statusData.length > 0 ? statusData : sampleData;
+        } catch (rowError) {
+            console.error('❌ Error fetching rows, using sample data:', rowError);
+            return sampleData;
+        }
     } catch (error) {
         console.error('❌ Error connecting to Google Sheets:', error);
         return sampleData;

@@ -1,6 +1,6 @@
 import { createSignal, Show, onMount, createEffect, onCleanup } from 'solid-js';
 import imageCompression from 'browser-image-compression';
-import { submitVisit, type VisitData } from '~/lib/server/sheets';
+import { submitVisit, getStatusList, type VisitData, type StatusOption } from '~/lib/server/sheets';
 import { uploadToGoogleDrive } from '~/lib/server/gdrive';
 import { TextField, Button, Card, Alert, PhotoCapture, SalesAutocomplete, Select, Autocomplete } from '~/components/ui';
 import Swal from 'sweetalert2';
@@ -95,6 +95,8 @@ export default function CanvasserForm() {
         keterangan: '',
     });
 
+    const [statusOptions, setStatusOptions] = createSignal<StatusOption[]>([]);
+
     onMount(() => {
         checkAccess(); 
         const savedData = localStorage.getItem('canvasser_form_data');
@@ -114,6 +116,17 @@ export default function CanvasserForm() {
             console.log("Auto-triggering location...");
             startWatchingLocation();
         }, 1000);
+        // Auto-trigger location slightly delayed
+        setTimeout(() => {
+            console.log("Auto-triggering location...");
+            startWatchingLocation();
+        }, 1000);
+
+        // Fetch Status List
+        getStatusList().then(options => {
+             console.log('Fetched Status Options:', options);
+             setStatusOptions(options);
+        });
     });
 
     // Persist form data to localStorage whenever it changes
@@ -427,10 +440,7 @@ export default function CanvasserForm() {
         if (!data.nama_pic) missingFields.push('Nama PIC');
         if (!data.status) missingFields.push('Status Kunjungan');
         
-        // Conditional Validation
-        if (data.status === 'Follow-Up' && !data.no_telp) {
-            missingFields.push('Nomor Telepon (Wajib untuk Follow-Up)');
-        }
+        if (!data.no_telp) missingFields.push('Nomor Telepon');
 
         if (!photoFile()) missingFields.push('Foto Toko');
 
@@ -576,29 +586,23 @@ export default function CanvasserForm() {
                             {/* Status & Phone */}
                             <Autocomplete
                                 label="Status Kunjungan"
-                                placeholder="Select Status"
+                                placeholder="Pilih..."
                                 value={formData().status}
                                 onChange={(value) => setFormData({ ...formData(), status: value })}
-                                options={[
-                                    { value: 'Follow-Up', label: 'Follow-Up' },
-                                    { value: 'Tidak Tertarik', label: 'Tidak Tertarik' },
-                                    { value: 'Activated', label: 'Activated' }
-                                ]}
+                                options={statusOptions()}
                                 required
                                 fullWidth
                             />
 
-                            <Show when={formData().status === 'Follow-Up'}>
-                                <TextField
-                                    label="Nomor Telepon"
-                                    type="tel"
-                                    value={formData().no_telp}
-                                    onInput={(e) => setFormData({ ...formData(), no_telp: e.currentTarget.value.replace(/\D/g, '') })}
-                                    required
-                                    fullWidth
-                                    helperText="Numbers only"
-                                />
-                            </Show>
+                            <TextField
+                                label="Nomor Telepon"
+                                type="tel"
+                                value={formData().no_telp}
+                                onInput={(e) => setFormData({ ...formData(), no_telp: e.currentTarget.value.replace(/\D/g, '') })}
+                                required
+                                fullWidth
+                                helperText="Numbers only"
+                            />
 
                             {/* Location */}
                             <div class="flex gap-2">

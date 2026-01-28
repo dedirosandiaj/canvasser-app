@@ -38,7 +38,15 @@ export function Autocomplete(props: AutocompleteProps) {
     const displayValue = createMemo(() => {
         if (!props.value) return '';
         const option = props.options.find(o => o.value === props.value);
-        return option ? `${option.value} - ${option.label}` : props.value;
+        
+        if (!option) return props.value;
+
+        // If label and value are same, show just one.
+        if (option.value === option.label) {
+            return option.label;
+        }
+
+        return `${option.value} - ${option.label}`;
     });
 
     // Filtered options based on query
