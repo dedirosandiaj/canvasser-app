@@ -141,14 +141,29 @@ export async function submitVisit(data: VisitData): Promise<{ success: boolean; 
             await sheet.setHeaderRow(headers);
         }
 
-        // Helper for Excel-friendly timestamp: YYYY-MM-DD HH:mm:ss
+        // Helper for Excel-friendly timestamp: YYYY-MM-DD HH:mm:ss (Asia/Jakarta)
         const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const formatter = new Intl.DateTimeFormat('id-ID', {
+            timeZone: 'Asia/Jakarta',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+
+        const parts = formatter.formatToParts(now);
+        const getPart = (type: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === type)?.value || '00';
+
+        const year = getPart('year');
+        const month = getPart('month');
+        const day = getPart('day');
+        const hours = getPart('hour');
+        const minutes = getPart('minute');
+        const seconds = getPart('second');
+
         const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 
         const rowValues = [
